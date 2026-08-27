@@ -108,6 +108,119 @@ class ShortcutSignals(QObject):
 
 # ── Reusable Widgets ──
 
+class FadeTooltip(QWidget):
+    """
+    A custom tooltip that fades in smoothly and fades out without blinking.
+    Replaces the default Qt tooltip which flickers when the cursor moves near edges.
+    """
+    _instance = None
+
+    @classmethod
+    def instance(cls):
+        if cls._instance is None:
+            cls._instance = cls()
+        return cls._instance
+
+    def __init__(self):
+        super().__init__(None)
+        self.setWindowFlags(
+            Qt.WindowType.ToolTip |
+            Qt.WindowType.FramelessWindowHint |
+            Qt.WindowType.WindowTransparentForInput |
+            Qt.WindowType.WindowDoesNotAcceptFocus
+        )
+        self.setAttribute(Qt.WidgetAttribute.WA_TranslucentBackground)
+        self.setAttribute(Qt.WidgetAttribute.WA_ShowWithoutActivating)
+        self._anim_state = 0  # 0=hidden, 1=fading_in, 2=visible, 3=fading_out
+
+        self._label = QLabel(self)
+        self._label.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        self._label.setStyleSheet("color: white; font-size: 12px; padding: 4px 8px;")
+
+        lay = QVBoxLayout(self)
+        lay.setContentsMargins(0, 0, 0, 0)
+        lay.addWidget(self._label)
+
+        self._opacity_effect = QGraphicsOpacityEffect(self)
+        self._opacity_effect.setOpacity(0.0)
+        self.setGraphicsEffect(self._opacity_effect)
+
+        self._anim = QPropertyAnimation(self._opacity_effect, b"opacity")
+        self._anim.setEasingCurve(QEasingCurve.Type.InOutSine)
+        self._anim.finished.connect(self._on_anim_finished)
+
+        # Delay timer: tooltip only shows after cursor rests 500ms on a button
+        self._show_delay = QTimer(self)
+        self._show_delay.setSingleShot(True)
+        self._show_delay.timeout.connect(self._do_show)
+        self._pending_pos = None
+        self._pending_text = None
+
+    def schedule_show(self, text, global_pos):
+        self._pending_text = text
+        self._pending_pos = global_pos
+        self._show_delay.start(500)
+
+    def cancel(self):
+        self._show_delay.stop()
+        self._fade_out()
+
+    def _do_show(self):
+        if not self._pending_text:
+            return
+        self._label.setText(self._pending_text)
+        self.adjustSize()
+        x = self._pending_pos.x() + 16
+        y = self._pending_pos.y() - self.height() // 2
+        self.move(x, y)
+        self._anim_state = 1
+        self._anim.stop()
+        self._opacity_effect.setOpacity(0.0)
+        super().show()
+        self._anim.setDuration(150)
+        self._anim.setStartValue(0.0)
+        self._anim.setEndValue(1.0)
+        self._anim.start()
+
+    def _fade_out(self):
+        if self._anim_state in (0, 3):
+            return
+        self._anim_state = 3
+        self._anim.stop()
+        self._anim.setDuration(100)
+        self._anim.setStartValue(self._opacity_effect.opacity())
+        self._anim.setEndValue(0.0)
+        self._anim.start()
+
+    def _on_anim_finished(self):
+        if self._anim_state == 1:
+            self._anim_state = 2
+        elif self._anim_state == 3:
+            self._anim_state = 0
+            super().hide()
+
+    def paintEvent(self, event):
+        painter = QPainter(self)
+        painter.setRenderHint(QPainter.RenderHint.Antialiasing)
+        painter.setBrush(QColor(51, 51, 51, 230))
+        painter.setPen(Qt.PenStyle.NoPen)
+        painter.drawRoundedRect(self.rect(), 5, 5)
+
+
+def _install_fade_tooltip(widget, text):
+    """Attach FadeTooltip enter/leave to a widget, disabling the blinking system tooltip."""
+    widget.setToolTip("")  # suppress the flickering native tooltip
+
+    def _enter(event, _t=text):
+        FadeTooltip.instance().schedule_show(_t, QCursor.pos())
+
+    def _leave(event):
+        FadeTooltip.instance().cancel()
+
+    widget.enterEvent = _enter
+    widget.leaveEvent = _leave
+
+
 class HoldButton(QPushButton):
     """QPushButton that emits hold_triggered after a long press (400ms)."""
     hold_triggered = pyqtSignal()
@@ -292,12 +405,11 @@ class CustomHoverMenu(FloatingPanel):
             btn.setIconSize(QPixmap(24, 24).size())
             
         btn.setFixedSize(36, 36)
-        btn.setToolTip(tooltip)
         btn.setCursor(Qt.CursorShape.PointingHandCursor)
         btn.setMouseTracking(True)
         btn.setAttribute(Qt.WidgetAttribute.WA_Hover, True)
-        btn.setAttribute(Qt.WidgetAttribute.WA_AlwaysShowToolTips, True)
         btn.clicked.connect(callback)
+        _install_fade_tooltip(btn, tooltip)
         
         idx = self.layout.count()
         self.layout.addWidget(btn, idx // 2, idx % 2)
@@ -354,13 +466,12 @@ class FloatingShapeToolbox(FloatingPanel):
     def add_action(self, icon, tooltip, callback):
         btn = QPushButton(icon)
         btn.setFixedSize(36, 36)
-        btn.setToolTip(tooltip)
         btn.setCursor(Qt.CursorShape.PointingHandCursor)
         btn.setMouseTracking(True)
         btn.setAttribute(Qt.WidgetAttribute.WA_Hover, True)
-        btn.setAttribute(Qt.WidgetAttribute.WA_AlwaysShowToolTips, True)
         btn.clicked.connect(callback)
         btn.setStyleSheet(TOOLBAR_STYLESHEET)
+        _install_fade_tooltip(btn, tooltip)
         
         idx = len(self.buttons)
         self.grid.addWidget(btn, idx // 2, idx % 2)
@@ -1340,12 +1451,8 @@ class FloatingColorPalette(FloatingPanel):
             btn = QPushButton()
             btn.setFixedSize(28, 28)
             color_name = COLOR_NAMES.get(color_hex, "Color")
-            btn.setToolTip(color_name)
-            btn.setCursor(Qt.CursorShape.PointingHandCursor)
-            btn.setMouseTracking(True)
-            btn.setAttribute(Qt.WidgetAttribute.WA_Hover, True)
-            btn.setAttribute(Qt.WidgetAttribute.WA_AlwaysShowToolTips, True)
             btn.clicked.connect(lambda checked, c=color_hex: self._select_color(c))
+            _install_fade_tooltip(btn, color_name)
             palette_grid.addWidget(btn, i // 4, i % 4)
             self.color_buttons[color_hex] = btn
 
@@ -1564,13 +1671,12 @@ class ToolbarWindow(QWidget):
     def _create_tool_button(self, icon, tooltip, callback):
         btn = QPushButton()
         btn.setText(icon)
-        btn.setToolTip(tooltip)
         btn.setFixedSize(36, 36)
         btn.setCursor(Qt.CursorShape.PointingHandCursor)
         btn.setMouseTracking(True)
         btn.setAttribute(Qt.WidgetAttribute.WA_Hover, True)
-        btn.setAttribute(Qt.WidgetAttribute.WA_AlwaysShowToolTips, True)
         btn.clicked.connect(callback)
+        _install_fade_tooltip(btn, tooltip)
         return btn
 
     def _create_hold_button(self, icon, tooltip, callback):
@@ -1579,8 +1685,8 @@ class ToolbarWindow(QWidget):
         btn.setCursor(Qt.CursorShape.PointingHandCursor)
         btn.setMouseTracking(True)
         btn.setAttribute(Qt.WidgetAttribute.WA_Hover, True)
-        btn.setAttribute(Qt.WidgetAttribute.WA_AlwaysShowToolTips, True)
         btn.clicked.connect(callback)
+        _install_fade_tooltip(btn, tooltip)
         return btn
 
     def _create_click_button(self, icon, tooltip):
@@ -1589,7 +1695,8 @@ class ToolbarWindow(QWidget):
         btn.setCursor(Qt.CursorShape.PointingHandCursor)
         btn.setMouseTracking(True)
         btn.setAttribute(Qt.WidgetAttribute.WA_Hover, True)
-        btn.setAttribute(Qt.WidgetAttribute.WA_AlwaysShowToolTips, True)
+        if tooltip:
+            _install_fade_tooltip(btn, tooltip)
         return btn
 
     def _setup_size_menu(self, btn, sizes, signal_emitter):
