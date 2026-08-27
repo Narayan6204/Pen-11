@@ -604,8 +604,14 @@ class OverlayWindow(QMainWindow):
         self.current_path = None
         self.last_point = None
         self.raw_points = []
+        self.raw_pressures = []         # Pressure value (0.0–1.0) per raw_point
         self.drawing = False
         self.undo_stack_size = 0
+
+        # Pen tablet support
+        self._tablet_pressure = 1.0     # Current pressure (1.0 = full/mouse)
+        self._tablet_active = False     # True while stylus is in contact
+        self._pre_eraser_mode = None    # Tool mode before eraser-end auto-switch
 
         # Shape detection timer
         self.shape_timer = QTimer(self)
@@ -879,13 +885,46 @@ class OverlayWindow(QMainWindow):
         return path
 
     @staticmethod
-    def _draw_stroke(painter, path, pen, mode):
-        """Draw a single stroke with optional pen halo for anti-alias softening."""
+    def _draw_stroke(painter, path, pen, mode, points=None, pressures=None):
+        """Draw a stroke. If points/pressures are provided, render with per-segment
+        variable width for pen tablet pressure sensitivity. Otherwise, draw with
+        a single fixed-width pen (mouse input / shapes)."""
         if mode == ToolMode.HIGHLIGHTER:
             painter.setOpacity(0.5)
         else:
             painter.setOpacity(1.0)
-            
+
+        # Variable-width pressure rendering (pen tablet)
+        has_pressure_data = (points is not None and pressures is not None
+                             and len(points) > 1 and len(pressures) > 1)
+        # Only use variable rendering if pressure actually varies (tablet input)
+        if has_pressure_data:
+            min_p = min(pressures)
+            max_p = max(pressures)
+            pressure_varies = (max_p - min_p) > 0.01
+
+            if pressure_varies:
+                base_width = pen.widthF()
+                base_color = pen.color()
+                cap = pen.capStyle()
+                join = pen.joinStyle()
+
+                for i in range(1, len(points)):
+                    avg_pressure = (pressures[i - 1] + pressures[i]) / 2.0
+                    seg_width = max(1.0, base_width * avg_pressure)
+
+                    seg_pen = QPen(base_color, seg_width, Qt.PenStyle.SolidLine, cap, join)
+                    seg_path = QPainterPath()
+                    seg_path.moveTo(points[i - 1])
+                    seg_path.lineTo(points[i])
+
+                    painter.setPen(seg_pen)
+                    painter.drawPath(seg_path)
+
+                painter.setOpacity(1.0)
+                return
+
+        # Fixed-width fallback (mouse input, shapes, or uniform-pressure strokes)
         painter.setPen(pen)
         painter.drawPath(path)
         painter.setOpacity(1.0)
@@ -976,7 +1015,40 @@ class OverlayWindow(QMainWindow):
         return rot_center, del_center, scale_center
 
     # ── Cache management (Removed for Pure Vector Rendering) ──
-    # ── Mouse events ──
+    # ── Tablet & Mouse events ──
+
+    def tabletEvent(self, event):
+        """Handle pen tablet input with pressure sensitivity and eraser-end detection.
+        Accepts the event to prevent Qt from also firing synthetic mouse events."""
+        self._tablet_pressure = event.pressure()
+        self._tablet_active = True
+
+        # Eraser-end auto-switch: flip stylus → eraser, flip back → restore previous tool
+        try:
+            pointer_type = event.pointerType()
+            # In PyQt6, PointerType.Eraser == 3
+            if pointer_type == 3:  # Eraser end of stylus
+                if self.mode != ToolMode.ERASER:
+                    self._pre_eraser_mode = self.mode
+                    self.set_mode(ToolMode.ERASER)
+            elif self._pre_eraser_mode is not None:
+                self.set_mode(self._pre_eraser_mode)
+                self._pre_eraser_mode = None
+        except Exception:
+            pass  # Not all tablets/drivers report pointer type
+
+        # Delegate to existing mouse handlers (QTabletEvent is API-compatible)
+        evt_type = event.type()
+        if evt_type == event.Type.TabletPress:
+            self.mousePressEvent(event)
+        elif evt_type == event.Type.TabletMove:
+            self.mouseMoveEvent(event)
+        elif evt_type == event.Type.TabletRelease:
+            self._tablet_active = False
+            self._tablet_pressure = 1.0
+            self.mouseReleaseEvent(event)
+
+        event.accept()  # Prevent synthetic mouse event duplication
 
     def mousePressEvent(self, event):
         if not self.ink_visible:
@@ -1091,6 +1163,7 @@ class OverlayWindow(QMainWindow):
             else:
                 self.drawing = True
                 self.raw_points = [event.position()]
+                self.raw_pressures = [self._tablet_pressure]
                 self.current_path = QPainterPath()
                 self.current_path.moveTo(event.position())
                 self.last_point = event.position()
@@ -1175,6 +1248,7 @@ class OverlayWindow(QMainWindow):
                 self.last_point = event.position()
             elif self.drawing and self.current_path and not self.shape_detected:
                 self.raw_points.append(event.position())
+                self.raw_pressures.append(self._tablet_pressure)
                 mid_point = (self.last_point + event.position()) / 2.0
                 self.current_path.quadTo(self.last_point, mid_point)
 
@@ -1236,7 +1310,17 @@ class OverlayWindow(QMainWindow):
                     ]
 
                 obb = QPolygonF(self.current_path.boundingRect())
-                self.paths.append({'path': self.current_path, 'pen': self._get_current_pen(), 'mode': self.mode, 'obb': obb})
+                stroke = {
+                    'path': self.current_path,
+                    'pen': self._get_current_pen(),
+                    'mode': self.mode,
+                    'obb': obb,
+                }
+                # Store pressure data for variable-width rendering (pen & highlighter only)
+                if self.mode in (ToolMode.PEN, ToolMode.HIGHLIGHTER) and self.raw_pressures:
+                    stroke['points'] = list(self.raw_points)
+                    stroke['pressures'] = list(self.raw_pressures)
+                self.paths.append(stroke)
                 self.undo_stack_size = min(self.MAX_UNDO_STEPS, self.undo_stack_size + 1)
 
                 self.current_path = None
@@ -1352,10 +1436,13 @@ class OverlayWindow(QMainWindow):
         # Pure Vector Rendering: Draw all saved paths dynamically
         for p in self.paths:
             if p['mode'] != ToolMode.ERASER:
-                self._draw_stroke(painter, p['path'], p['pen'], p['mode'])
+                self._draw_stroke(painter, p['path'], p['pen'], p['mode'],
+                                  p.get('points'), p.get('pressures'))
         
         if self.drawing and self.current_path:
-            self._draw_stroke(painter, self.current_path, self._get_current_pen(), self.mode)
+            self._draw_stroke(painter, self.current_path, self._get_current_pen(), self.mode,
+                              self.raw_points if self.raw_points else None,
+                              self.raw_pressures if self.raw_pressures else None)
 
         painter.setOpacity(1.0)
         if self.mode == ToolMode.SELECT:
