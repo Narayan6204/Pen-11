@@ -40,11 +40,14 @@ class SettingsManager:
             self._data = dict(DEFAULTS)
 
     def _flush(self):
-        """Write current settings to disk immediately."""
+        """Write current settings to disk atomically (temp file + rename).
+        This prevents corruption if the app crashes mid-write."""
         try:
             os.makedirs(self._dir, exist_ok=True)
-            with open(self._path, 'w', encoding='utf-8') as f:
+            tmp_path = self._path + '.tmp'
+            with open(tmp_path, 'w', encoding='utf-8') as f:
                 json.dump(self._data, f, indent=2)
+            os.replace(tmp_path, self._path)  # atomic on Windows (POSIX-like)
         except (OSError, PermissionError):
             pass  # Silently fail — don't crash the app over a settings write
 

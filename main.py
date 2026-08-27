@@ -33,7 +33,7 @@ if sys.platform == "win32":
         print(f"Warning: Optimization setup failed: {e}")
 
 from PyQt6.QtWidgets import (
-    QApplication, QMainWindow, QWidget, QVBoxLayout, QHBoxLayout,
+    QApplication, QMainWindow, QWidget, QVBoxLayout,
     QPushButton, QLabel, QGridLayout, QSystemTrayIcon, QMenu, QFrame,
     QGraphicsDropShadowEffect, QMessageBox, QGraphicsOpacityEffect
 )
@@ -208,14 +208,24 @@ class FadeTooltip(QWidget):
 
 
 def _install_fade_tooltip(widget, text):
-    """Attach FadeTooltip enter/leave to a widget, disabling the blinking system tooltip."""
+    """Attach FadeTooltip enter/leave to a widget, disabling the blinking system tooltip.
+    Chains the original Qt event handlers so native hover styling is preserved.
+    """
     widget.setToolTip("")  # suppress the flickering native tooltip
+
+    orig_enter = widget.enterEvent
+    orig_leave = widget.leaveEvent
 
     def _enter(event, _t=text):
         FadeTooltip.instance().schedule_show(_t, QCursor.pos())
+        orig_enter(event)  # preserve Qt hover highlight
 
-    def _leave(event):
-        FadeTooltip.instance().cancel()
+    def _leave(event, _t=text):
+        # Only cancel if this button's tooltip is the one pending (race-condition fix)
+        tip = FadeTooltip.instance()
+        if tip._pending_text == _t or tip._anim_state in (1, 2):
+            tip.cancel()
+        orig_leave(event)  # preserve Qt hover highlight
 
     widget.enterEvent = _enter
     widget.leaveEvent = _leave
@@ -613,6 +623,7 @@ class OverlayWindow(QMainWindow):
         self.selection_start_path = None
         self.selection_start_center = None
         self.selection_rotation_start_angle = 0
+        self.selection_start_states = []  # FIX 7: always initialized
 
         # Connect signals
         self.signals.switch_pen.connect(lambda: self.set_mode(ToolMode.PEN))
@@ -712,8 +723,16 @@ class OverlayWindow(QMainWindow):
     # ── Mode / state ──
 
     def set_mode(self, new_mode):
+        # Safety: restore any stuck blank cursor from mid-stroke mode switch
         while QApplication.overrideCursor() is not None:
             QApplication.restoreOverrideCursor()
+        # Safety: re-enable GC if a mid-stroke keyboard shortcut bypassed mouseReleaseEvent
+        if not gc.isenabled():
+            gc.enable()
+        # Safety: stop shape detection timer so _detect_shape can't fire on stale path
+        self.shape_timer.stop()
+        self.drawing = False
+
         # Rule: Only PEN can activate a hidden canvas (removed for highlighter and eraser)
         if not self.ink_visible and new_mode == ToolMode.PEN:
             self.toggle_visibility()
@@ -756,6 +775,14 @@ class OverlayWindow(QMainWindow):
         self.update()
 
     def toggle_visibility(self):
+        # Safety: if user hides mid-stroke, restore blank cursor and GC
+        while QApplication.overrideCursor() is not None:
+            QApplication.restoreOverrideCursor()
+        if not gc.isenabled():
+            gc.enable()
+        self.drawing = False
+        self.shape_timer.stop()
+
         self.ink_visible = not self.ink_visible
         if self.ink_visible and self.mode == ToolMode.CURSOR:
             self.set_mode(ToolMode.PEN)
@@ -1203,6 +1230,10 @@ class OverlayWindow(QMainWindow):
 
                 if len(self.paths) >= self.MAX_STROKES:
                     self.paths.pop(0)
+                    # Shift selected indices down by 1; remove any that pointed to the deleted stroke
+                    self.selected_path_indices = [
+                        idx - 1 for idx in self.selected_path_indices if idx > 0
+                    ]
 
                 obb = QPolygonF(self.current_path.boundingRect())
                 self.paths.append({'path': self.current_path, 'pen': self._get_current_pen(), 'mode': self.mode, 'obb': obb})
@@ -1264,7 +1295,10 @@ class OverlayWindow(QMainWindow):
     # ── Shape detection ──
 
     def _detect_shape(self):
-        if not self.drawing or len(self.raw_points) < 10:
+        # Guard: if stroke was already committed or cancelled, do nothing
+        if self.current_path is None or not self.drawing:
+            return
+        if len(self.raw_points) < 10:
             return
         start, end = self.raw_points[0], self.raw_points[-1]
         xs = [p.x() for p in self.raw_points]
