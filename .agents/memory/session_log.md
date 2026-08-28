@@ -3,7 +3,31 @@
 
 ---
 
+## Session — 2026-08-28 14:45 IST (Elite Reasoning Skill for Gemini)
+
+### What Was Done
+- Created comprehensive cognitive framework skill at `.agents/skills/elite-reasoning-for-gemini/SKILL.md`
+- Skill covers: structured thinking protocol, 5-phase reasoning loop, investigation methodology, debugging patterns, adversarial self-review checklist, common AI model traps, and Gemini-specific thinking tips
+- Created power user guide artifact with 10 practical tips, prompt patterns, and model selection strategy
+- Added Rule #6 to `GEMINI.md` to auto-activate the elite reasoning skill on all coding tasks
+
+### Key Decisions Made
+- Skill focuses on *cognitive methodology* (how to think) rather than domain knowledge (what to know)
+- Structured around the core insight: 60% reading/investigating, 40% writing
+- Includes concrete examples from real bugs found in Pen 11 (tooltip blinking, index invalidation)
+- Designed to work with Gemini's extended thinking mode — structured phases, not stream-of-consciousness
+
+### Confidence Level
+- HIGH — skill is based on observed patterns from actual debugging sessions, not theory
+
+### Next Steps
+- User can copy the skill to other projects' `.agents/skills/` directories
+- Consider adding the skill to global config at `~/.gemini/config/` for all projects
+
+---
+
 ## Session — 2026-08-28 14:30 IST (Smart Popup Positioning)
+
 
 ### What Was Done
 - Fixed all popups/panels going off-screen when toolbar is dragged to edge

@@ -57,3 +57,10 @@ Whenever the user requests to build, design, style, or refactor any website, web
   - `.agents/memory/decisions.md` (if design decisions were made)
 - **Subagent Context Passing**: When spawning subagents, always include relevant excerpts from `mindmap.md` and `code_index.md` in the subagent prompt.
 
+## 6. Elite Reasoning Framework (ALL Coding Tasks)
+- **Activate**: `.agents/skills/elite-reasoning-for-gemini/SKILL.md` — read and follow on EVERY non-trivial coding task.
+- **Mandatory Cognitive Loop**: Understand → Investigate (read files!) → Plan (define invariants) → Doubt (red-team yourself) → Execute (minimal diff) → Verify.
+- **Never assume** — always read the actual code before modifying it. Trace all callers. Map ripple effects.
+- **Fix root causes**, not symptoms. Ask "why?" at least 3-5 times before writing a fix.
+- **Adversarial self-review**: After writing code, spend 20% of thinking budget trying to break it.
+
