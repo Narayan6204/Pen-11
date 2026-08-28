@@ -1,4 +1,20 @@
 # Session Log — Pen 11
+
+---
+
+## Session - 2026-08-28 22:30 IST (Fix Border Restriction Bugs)
+
+### What Was Done
+- Fixed ToolbarWindow.start_expand bug where expanding the toolbar near the bottom of the screen snapped it upwards. The toolbar can now safely expand below the screen edge.
+- Fixed FloatingPanel._smart_position bug where the entire floating panel's height was restricted to the screen. It now only restricts the top 40px (the handle area) so the panel can go partially off-screen.
+- Fixed MainAppCoordinator._clamp_to_screen bug where moving the main toolbar forced attached floating panels to snap completely inside the screen bounds. It now uses clamp_handle_to_screen(panel.btn_handle) to only keep the pill handle on screen.
+
+### Key Decisions Made
+- Allowed the toolbar body and floating panel bodies to safely cross the taskbar (task manager) boundary and go off-screen.
+- Border restriction now strictly applies ONLY to the pill handles.
+
+### Confidence Level
+- HIGH - Tested logic thoroughly and syntactically validated main.py.
 > Append a new entry at the TOP after every session. Newest entry first.
 
 ---

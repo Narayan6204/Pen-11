@@ -99,7 +99,7 @@ web/js/app.js
 | `FloatingColorPalette` | main.py | L1553 | 12-swatch color picker, active glow |
 | `ToolbarWindow` | main.py | L1635 | **CORE**: floating toolbar, collapsible pill animation |
 | `AppSystemTray` | main.py | L2038 | System tray icon + context menu |
-| `MainAppCoordinator` | main.py | L2070 | **CORE**: master coordinator, settings restore, hotkeys, `_clamp_to_screen` |
+| `MainAppCoordinator` | main.py | L2070 | **CORE**: master coordinator, settings restore, hotkeys, `_clamp_to_screen (pill handle only)` |
 | `SettingsManager` | storage.py | L22 | JSON persistence in %APPDATA%/Pen11/settings.json (atomic write via .tmp) |
 | `SingleInstanceGuard` | process_manager.py | L14 | IPC pipe to prevent duplicate instances |
 

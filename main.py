@@ -414,10 +414,13 @@ class FloatingPanel(QWidget):
             target_x = max(geom.left() + gap,
                            min(geom.right() - popup_w - gap, win_rect.left() - popup_w - gap))
 
-        # --- Vertical placement: center on anchor button, clamp to screen ---
+        # --- Vertical placement: center on anchor button, clamp loosely ---
         ideal_y = btn_rect.center().y() - popup_h // 2
-        target_y = max(geom.top() + gap,
-                       min(geom.bottom() - popup_h - gap, ideal_y))
+        
+        # We only want to ensure the top part (handle) doesn't go off the top edge entirely
+        # and doesn't get pushed completely below the screen. We don't restrict the whole height.
+        handle_h = 40
+        target_y = max(geom.top() - gap, min(geom.bottom() - handle_h, ideal_y))
 
         return QPoint(target_x, target_y)
 
@@ -2021,14 +2024,9 @@ class ToolbarWindow(QWidget):
 
         current_h = self.height()
         target_h = self._full_height or 557
-
-        # Ensure expanding toolbar fits on screen (push up if near bottom edge)
-        screen = QApplication.screenAt(self.geometry().center()) or QApplication.primaryScreen()
-        geom = screen.geometry()
-        if self.y() + target_h > geom.bottom() + 1:
-            adjusted_y = max(geom.top(), geom.bottom() - target_h + 1)
-            if adjusted_y != self.y():
-                self.move(self.x(), adjusted_y)
+        
+        # We no longer restrict the expanded toolbar from going off the bottom of the screen.
+        # This allows the user to leave the pill handle near the taskbar.
 
         # Ensure collapsible widgets remain hidden during the height transition
         for w in self._collapsible_widgets:
@@ -2377,15 +2375,16 @@ class MainAppCoordinator(QObject):
             self.shape_toolbox.fade_in()
 
     def _clamp_to_screen(self, panel):
-        """If a user-dragged panel has gone off-screen, clamp it back inside.
+        """If a user-dragged panel has gone off-screen, clamp its handle back inside.
         Returns True if clamping was applied."""
-        center = panel.geometry().center()
-        screen = QApplication.screenAt(center) or QApplication.primaryScreen()
-        geom = screen.geometry()
-        x = max(geom.left(), min(geom.right() - panel.width() + 1, panel.x()))
-        y = max(geom.top(), min(geom.bottom() - panel.height() + 1, panel.y()))
-        if QPoint(x, y) != panel.pos():
-            panel.move(x, y)
+        if not hasattr(panel, 'btn_handle'):
+            return False
+            
+        old_pos = panel.pos()
+        new_pos = clamp_handle_to_screen(panel.btn_handle, old_pos)
+        
+        if new_pos != old_pos:
+            panel.move(new_pos)
             return True
         return False
 
