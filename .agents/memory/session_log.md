@@ -3,6 +3,25 @@
 
 ---
 
+## Session — 2026-08-28 21:53 IST (Pill Handle & Window Screen Boundary Clamping)
+
+### What Was Done
+- Fixed screen boundary restriction for toolbar, collapsed pill handle (`DragHandle`), and floating panels (`FloatingPanel`).
+- Implemented `clamp_widget_to_screen(widget, target_pos, margin=0)` helper using active monitor's `screen.availableGeometry()`.
+- Updated `DragHandle.mouseMoveEvent` and `ToolbarWindow.mouseMoveEvent` to compute clamped movement and emit `actual_delta` so connected sub-panels stay synchronized without drift.
+- Updated `ToolbarWindow.start_expand()` to automatically push upward if expanding near the bottom screen border so all buttons remain visible.
+- Verified AST syntax (OK) and successfully built self-contained `dist/Pen 11.exe`.
+
+### Key Decisions Made
+- Multi-monitor aware via `QApplication.screenAt(cursor/widget_rect)` so dragging across multiple screens transitions seamlessly.
+- Available geometry used to automatically prevent hiding behind the Windows taskbar.
+- Synchronized actual delta prevents attached palettes from sliding when toolbar hits screen edges.
+
+### Confidence Level
+- HIGH — syntax checked, full PyInstaller binary compiled with 0 errors.
+
+---
+
 ## Session — 2026-08-28 21:38 IST (Restore Point Snapshot)
 
 ### What Was Done

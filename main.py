@@ -297,6 +297,23 @@ def create_shape_icon(shape_type, size=32):
     return QIcon(pixmap)
 
 
+def clamp_widget_to_screen(widget, target_pos, margin=0):
+    """Calculate clamped screen position ensuring the widget stays within availableGeometry,
+    properly accounting for multi-monitor setups and Windows taskbars."""
+    w = widget.width()
+    h = widget.height()
+    proposed_rect = QRect(target_pos.x(), target_pos.y(), w, h)
+
+    # Check active monitor at proposed center, cursor position, or primary monitor
+    screen = QApplication.screenAt(proposed_rect.center()) or QApplication.screenAt(QCursor.pos()) or QApplication.primaryScreen()
+    avail = screen.availableGeometry()
+
+    clamped_x = max(avail.left() + margin, min(avail.right() - w - margin + 1, target_pos.x()))
+    clamped_y = max(avail.top() + margin, min(avail.bottom() - h - margin + 1, target_pos.y()))
+
+    return QPoint(clamped_x, clamped_y)
+
+
 class FloatingPanel(QWidget):
     """Reusable base for floating toolboxes with smooth windowOpacity fade and drag support."""
     def __init__(self, signals=None, parent=None):
@@ -413,7 +430,8 @@ class FloatingPanel(QWidget):
     def mouseMoveEvent(self, event):
         if self._drag_pos is not None:
             delta = event.globalPosition().toPoint() - self._drag_pos
-            self.move(self.pos() + delta)
+            new_pos = clamp_widget_to_screen(self, self.pos() + delta)
+            self.move(new_pos)
             self._drag_pos = event.globalPosition().toPoint()
             self.has_been_dragged = True
             event.accept()
@@ -583,14 +601,19 @@ class DragHandle(QWidget):
     def mouseMoveEvent(self, event):
         if self._drag_pos is not None:
             delta = event.globalPosition().toPoint() - self._drag_pos
-            self.parent().move(self.parent().pos() + delta)
+            parent = self.parent()
+            old_pos = parent.pos()
+            new_pos = clamp_widget_to_screen(parent, old_pos + delta)
+            actual_delta = new_pos - old_pos
+
+            parent.move(new_pos)
             self._drag_pos = event.globalPosition().toPoint()
-            self.parent().has_been_dragged = True
-            
+            parent.has_been_dragged = True
+
             # ONLY the main toolbar emits toolbar_moved to move attached sub-panels
-            if self.parent().__class__.__name__ == 'ToolbarWindow':
-                if hasattr(self.parent(), 'signals') and hasattr(self.parent().signals, 'toolbar_moved'):
-                    self.parent().signals.toolbar_moved.emit(delta)
+            if parent.__class__.__name__ == 'ToolbarWindow':
+                if hasattr(parent, 'signals') and hasattr(parent.signals, 'toolbar_moved'):
+                    parent.signals.toolbar_moved.emit(actual_delta)
             event.accept()
 
     def mouseReleaseEvent(self, event):
@@ -1998,6 +2021,14 @@ class ToolbarWindow(QWidget):
         current_h = self.height()
         target_h = self._full_height or 557
 
+        # Ensure expanding toolbar fits on screen (push up if near bottom edge)
+        screen = QApplication.screenAt(self.geometry().center()) or QApplication.primaryScreen()
+        avail = screen.availableGeometry()
+        if self.y() + target_h > avail.bottom() + 1:
+            adjusted_y = max(avail.top(), avail.bottom() - target_h + 1)
+            if adjusted_y != self.y():
+                self.move(self.x(), adjusted_y)
+
         # Ensure collapsible widgets remain hidden during the height transition
         for w in self._collapsible_widgets:
             w.hide()
@@ -2048,11 +2079,15 @@ class ToolbarWindow(QWidget):
     def mouseMoveEvent(self, event):
         if getattr(self, '_drag_pos', None) is not None:
             delta = event.globalPosition().toPoint() - self._drag_pos
-            self.move(self.pos() + delta)
+            old_pos = self.pos()
+            new_pos = clamp_widget_to_screen(self, old_pos + delta)
+            actual_delta = new_pos - old_pos
+
+            self.move(new_pos)
             self._drag_pos = event.globalPosition().toPoint()
             self.has_been_dragged = True
             if hasattr(self, 'signals') and hasattr(self.signals, 'toolbar_moved'):
-                self.signals.toolbar_moved.emit(delta)
+                self.signals.toolbar_moved.emit(actual_delta)
             event.accept()
         else:
             super().mouseMoveEvent(event)
@@ -2339,13 +2374,9 @@ class MainAppCoordinator(QObject):
     def _clamp_to_screen(self, panel):
         """If a user-dragged panel has gone off-screen, clamp it back inside.
         Returns True if clamping was applied."""
-        center = panel.geometry().center()
-        screen = QApplication.screenAt(center) or QApplication.primaryScreen()
-        avail = screen.availableGeometry()
-        x = max(avail.left() + 5, min(avail.right() - panel.width() - 5, panel.x()))
-        y = max(avail.top() + 5, min(avail.bottom() - panel.height() - 5, panel.y()))
-        if QPoint(x, y) != panel.pos():
-            panel.move(x, y)
+        new_pos = clamp_widget_to_screen(panel, panel.pos())
+        if new_pos != panel.pos():
+            panel.move(new_pos)
             return True
         return False
 
