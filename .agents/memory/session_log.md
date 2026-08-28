@@ -3,6 +3,22 @@
 
 ---
 
+## Session — 2026-08-28 21:38 IST (Restore Point Snapshot)
+
+### What Was Done
+- Created formal restore point tag `restore-point-2026-08-28-stable` at commit `4d82d23`.
+- Backed up all recent stable features:
+  1. Smart screen-aware popup positioning with auto-flip and taskbar clamping
+  2. Pen tablet pressure-sensitive variable-width stroke engine + eraser auto-switch
+  3. FadeTooltip singleton and PEN-only cursor hide
+  4. Memory mind map system and Elite Reasoning Framework
+- Pushed tag to remote GitHub repository.
+
+### Confidence Level
+- HIGH — repository clean, all tests passing, tag pushed.
+
+---
+
 ## Session — 2026-08-28 14:45 IST (Elite Reasoning Skill for Gemini)
 
 ### What Was Done
