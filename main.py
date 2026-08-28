@@ -357,6 +357,52 @@ class FloatingPanel(QWidget):
             self.setWindowOpacity(1.0)
             super().hide()
 
+    @staticmethod
+    def _smart_position(popup_widget, anchor_widget, gap=10):
+        """Calculate the best screen position for popup_widget anchored to anchor_widget.
+        
+        Rules:
+        1. Prefer left of anchor. Flip to right if no room.
+        2. Vertically center popup on the anchor button.
+        3. Clamp within the active screen's available geometry (avoids taskbar).
+        4. Works correctly on multi-monitor setups.
+        
+        Returns: QPoint with the ideal top-left position for the popup.
+        """
+        popup_widget.adjustSize()
+        popup_w = popup_widget.width()
+        popup_h = popup_widget.height()
+
+        # Map anchor widget's top-left to global screen coordinates
+        btn_global = anchor_widget.mapToGlobal(QPoint(0, 0))
+        btn_rect = QRect(btn_global, anchor_widget.size())
+
+        # Find the active screen that contains the anchor button center
+        screen = QApplication.screenAt(btn_rect.center()) or QApplication.primaryScreen()
+        avail = screen.availableGeometry()  # excludes taskbar automatically
+
+        # --- Horizontal placement ---
+        space_left = btn_rect.left() - avail.left()
+        space_right = avail.right() - btn_rect.right()
+
+        if space_left >= popup_w + gap:
+            # Default: Place to the LEFT of anchor
+            target_x = btn_rect.left() - popup_w - gap
+        elif space_right >= popup_w + gap:
+            # Flip: Place to the RIGHT of anchor
+            target_x = btn_rect.right() + gap
+        else:
+            # Tight screen — clamp as best we can
+            target_x = max(avail.left() + gap,
+                           min(avail.right() - popup_w - gap, btn_rect.left() - popup_w - gap))
+
+        # --- Vertical placement: center on anchor, clamp to screen ---
+        ideal_y = btn_rect.center().y() - popup_h // 2
+        target_y = max(avail.top() + gap,
+                       min(avail.bottom() - popup_h - gap, ideal_y))
+
+        return QPoint(target_x, target_y)
+
     def mousePressEvent(self, event):
         if event.button() == Qt.MouseButton.LeftButton:
             self._drag_pos = event.globalPosition().toPoint()
@@ -426,10 +472,9 @@ class CustomHoverMenu(FloatingPanel):
         return btn
 
     def show_menu(self, anchor_widget):
-        self.adjustSize()
         if not self.has_been_dragged:
-            global_pos = anchor_widget.mapToGlobal(QPoint(-self.width() - 5, 0))
-            self.move(global_pos)
+            pos = FloatingPanel._smart_position(self, anchor_widget)
+            self.move(pos)
         self.raise_()
         self.fade_in(150)
 
@@ -1824,7 +1869,21 @@ class ToolbarWindow(QWidget):
         menu = QMenu(self)
         for label, size in zip(["Mini", "Small", "Medium", "Big", "Large"], sizes):
             menu.addAction(label, lambda checked=False, s=size: signal_emitter(s))
-        btn.hold_triggered.connect(lambda: menu.exec(btn.mapToGlobal(QPoint(btn.width() + 5, 0))))
+        def _show_size_menu(b=btn, m=menu):
+            # Smart position: prefer right of button, clamp to screen
+            btn_global = b.mapToGlobal(QPoint(0, 0))
+            btn_rect = QRect(btn_global, b.size())
+            screen = QApplication.screenAt(btn_rect.center()) or QApplication.primaryScreen()
+            avail = screen.availableGeometry()
+            # Prefer right of button
+            x = btn_rect.right() + 5
+            if x + 120 > avail.right():  # 120px estimated menu width
+                x = btn_rect.left() - 120 - 5
+            x = max(avail.left() + 5, x)
+            y = btn_rect.top()
+            y = max(avail.top() + 5, min(avail.bottom() - 100, y))
+            m.exec(QPoint(x, y))
+        btn.hold_triggered.connect(_show_size_menu)
 
     def _set_active_tool(self, btn, callback):
         if hasattr(self, 'active_tool_btn') and self.active_tool_btn:
@@ -2015,12 +2074,12 @@ class ToolbarWindow(QWidget):
         super().moveEvent(event)
         if hasattr(self, 'shape_menu') and self.shape_menu and self.shape_menu.isVisible() and self.shape_menu._fade_state in (1, 2):
             if not self.shape_menu.has_been_dragged:
-                global_pos = self.btn_shape.mapToGlobal(QPoint(-self.shape_menu.width() - 5, 0))
-                self.shape_menu.move(global_pos)
+                pos = FloatingPanel._smart_position(self.shape_menu, self.btn_shape)
+                self.shape_menu.move(pos)
         if hasattr(self, 'cursor_menu') and self.cursor_menu and self.cursor_menu.isVisible() and self.cursor_menu._fade_state in (1, 2):
             if not self.cursor_menu.has_been_dragged:
-                global_pos = self.btn_cursor.mapToGlobal(QPoint(-self.cursor_menu.width() - 5, 0))
-                self.cursor_menu.move(global_pos)
+                pos = FloatingPanel._smart_position(self.cursor_menu, self.btn_cursor)
+                self.cursor_menu.move(pos)
 
 
 # ── System Tray ──
@@ -2260,8 +2319,10 @@ class MainAppCoordinator(QObject):
             self.color_palette.fade_out()
         else:
             if not self.color_palette.has_been_dragged:
-                global_pos = self.toolbar.btn_palette.mapToGlobal(QPoint(0, 0))
-                self.color_palette.move(global_pos.x() - self.color_palette.width() - 10, global_pos.y())
+                pos = FloatingPanel._smart_position(self.color_palette, self.toolbar.btn_palette)
+                self.color_palette.move(pos)
+            elif self._clamp_to_screen(self.color_palette):
+                pass  # clamped in-place if dragged off-screen
             self.color_palette.fade_in()
 
     def _toggle_shape_toolbox(self):
@@ -2269,9 +2330,24 @@ class MainAppCoordinator(QObject):
             self.shape_toolbox.fade_out()
         else:
             if not self.shape_toolbox.has_been_dragged:
-                btn_pos = self.toolbar.btn_shape.mapToGlobal(QPoint(0, 0))
-                self.shape_toolbox.move(btn_pos.x() - self.shape_toolbox.width() - 10, btn_pos.y())
+                pos = FloatingPanel._smart_position(self.shape_toolbox, self.toolbar.btn_shape)
+                self.shape_toolbox.move(pos)
+            elif self._clamp_to_screen(self.shape_toolbox):
+                pass  # clamped in-place if dragged off-screen
             self.shape_toolbox.fade_in()
+
+    def _clamp_to_screen(self, panel):
+        """If a user-dragged panel has gone off-screen, clamp it back inside.
+        Returns True if clamping was applied."""
+        center = panel.geometry().center()
+        screen = QApplication.screenAt(center) or QApplication.primaryScreen()
+        avail = screen.availableGeometry()
+        x = max(avail.left() + 5, min(avail.right() - panel.width() - 5, panel.x()))
+        y = max(avail.top() + 5, min(avail.bottom() - panel.height() - 5, panel.y()))
+        if QPoint(x, y) != panel.pos():
+            panel.move(x, y)
+            return True
+        return False
 
     def _quit_app(self):
         """Cleanly shut down the application, saving final state."""
