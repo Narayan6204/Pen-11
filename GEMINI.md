@@ -45,3 +45,15 @@ Whenever the user requests to build, design, style, or refactor any website, web
 - **PyQt6 Animations**: Before writing any animation code in `main.py` (transitions, collapse/expand, fades, slides), strictly follow `.agents/skills/pyqt-animation-skill/SKILL.md`.
 - **Lottie & Gemini**: Follow `.agents/skills/lottie-gemini-skill/SKILL.md` to prevent runtime crashes.
 
+## 5. Persistent Memory — AI Mind Map (MANDATORY)
+- **Activate**: At the START of every session, read `.agents/skills/ai-mind-map-memory/SKILL.md`.
+- **Session Start**: Read `.agents/memory/mindmap.md` and `.agents/memory/session_log.md` BEFORE touching any code.
+  - If these files don't exist → run the **Bootstrap Protocol** from the skill.
+  - If they exist → use them as your starting context. Do NOT re-scan the full codebase.
+- **Session End**: After every session with code changes, update:
+  - `.agents/memory/session_log.md` (append new entry with what was done + next steps)
+  - `.agents/memory/mindmap.md` (if architecture/files changed)
+  - `.agents/memory/code_index.md` (if new symbols added)
+  - `.agents/memory/decisions.md` (if design decisions were made)
+- **Subagent Context Passing**: When spawning subagents, always include relevant excerpts from `mindmap.md` and `code_index.md` in the subagent prompt.
+
