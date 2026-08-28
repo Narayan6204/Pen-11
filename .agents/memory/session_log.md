@@ -3,6 +3,32 @@
 
 ---
 
+## Session — 2026-08-28 22:05 IST (Elite Reasoning Refinement: Dynamic Popups, Pill Handle Clamping & Taskbar Passage)
+
+### What Was Done
+- Applied Elite Reasoning methodology to address all 3 user concerns with surgical accuracy:
+  1. **Color Palette & Sub-toolbar Dynamic Popups**:
+     - `FloatingPanel._smart_position()` now measures relative to the outer `ToolbarWindow` geometry instead of nested internal button coordinates, ensuring zero overlap with toolbar margins when flipped to the Right side.
+     - Accurate true layout size constraints (`sizeHint` measurement with minimum 160px) prevent hidden unrendered size underestimation.
+     - `MainAppCoordinator._sync_toolboxes_position` now re-evaluates `_smart_position` dynamically when dragging the toolbar, enabling live Left/Right flipping in real-time as the toolbar crosses the screen.
+  2. **Pill Handle Boundary Restriction**:
+     - Removed hard clamping from `ToolbarWindow.mouseMoveEvent`, restoring natural free dragging for the toolbar body.
+     - Applied `clamp_handle_to_screen(handle_widget, target_parent_pos)` strictly to `DragHandle` (the pill handle) so the pill handle is guaranteed never to get lost off-screen.
+  3. **Full Screen Resolution & Taskbar Navigation**:
+     - Switched from `screen.availableGeometry()` to `screen.geometry()` for drag clamping, allowing the handle and toolbar to navigate freely across the full physical display area (including over the Windows taskbar).
+- Verified AST syntax (100% OK).
+- Successfully built clean self-contained `dist/Pen 11.exe` with PyInstaller.
+
+### Key Decisions Made
+- Anchoring popups to the outer window frame completely resolves margin clipping.
+- Restricting handle coordinates rather than window coordinates preserves natural window dragging while preventing handle loss.
+- `screen.geometry()` used for maximum freedom across desktop bounds.
+
+### Confidence Level
+- HIGH — verified, all 3 issues resolved, clean binary compiled.
+
+---
+
 ## Session — 2026-08-28 21:53 IST (Pill Handle & Window Screen Boundary Clamping)
 
 ### What Was Done
