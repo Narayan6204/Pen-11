@@ -297,21 +297,6 @@ def create_shape_icon(shape_type, size=32):
     return QIcon(pixmap)
 
 
-def clamp_handle_to_screen(handle_widget, target_parent_pos):
-    """Clamps target_parent_pos so the drag handle stays on the physical screen (including over taskbar)."""
-    handle_pos_in_parent = handle_widget.pos()
-    handle_proposed_global = target_parent_pos + handle_pos_in_parent
-    screen = QApplication.screenAt(QCursor.pos()) or QApplication.screenAt(handle_proposed_global) or QApplication.primaryScreen()
-    geom = screen.geometry()  # Full screen resolution (can cross taskbar area)
-
-    clamped_handle_x = max(geom.left(), min(geom.right() - handle_widget.width() + 1, handle_proposed_global.x()))
-    clamped_handle_y = max(geom.top(), min(geom.bottom() - handle_widget.height() + 1, handle_proposed_global.y()))
-
-    clamped_parent_x = clamped_handle_x - handle_pos_in_parent.x()
-    clamped_parent_y = clamped_handle_y - handle_pos_in_parent.y()
-    return QPoint(clamped_parent_x, clamped_parent_y)
-
-
 class FloatingPanel(QWidget):
     """Reusable base for floating toolboxes with smooth windowOpacity fade and drag support."""
     def __init__(self, signals=None, parent=None):
@@ -377,50 +362,44 @@ class FloatingPanel(QWidget):
         """Calculate the best screen position for popup_widget anchored to anchor_widget.
         
         Rules:
-        1. Uses outer toolbar window geometry so Left/Right placement never overlaps toolbar margins.
-        2. Accurately measures minimum popup dimensions.
-        3. Vertically centers popup on the anchor button.
-        4. Clamps within full screen boundaries (can travel across taskbar).
-        5. Works accurately on multi-monitor setups.
+        1. Prefer left of anchor. Flip to right if no room.
+        2. Vertically center popup on the anchor button.
+        3. Clamp within the active screen's available geometry (avoids taskbar).
+        4. Works correctly on multi-monitor setups.
+        
+        Returns: QPoint with the ideal top-left position for the popup.
         """
         popup_widget.adjustSize()
-        popup_w = max(popup_widget.sizeHint().width(), popup_widget.width(), 160)
-        popup_h = max(popup_widget.sizeHint().height(), popup_widget.height(), 160)
+        popup_w = popup_widget.width()
+        popup_h = popup_widget.height()
 
         # Map anchor widget's top-left to global screen coordinates
         btn_global = anchor_widget.mapToGlobal(QPoint(0, 0))
         btn_rect = QRect(btn_global, anchor_widget.size())
 
-        # Determine outer window geometry for clean exterior positioning
-        anchor_win = anchor_widget.window()
-        win_rect = anchor_win.geometry() if anchor_win else btn_rect
+        # Find the active screen that contains the anchor button center
+        screen = QApplication.screenAt(btn_rect.center()) or QApplication.primaryScreen()
+        avail = screen.availableGeometry()  # excludes taskbar automatically
 
-        # Active monitor using full geometry
-        screen = QApplication.screenAt(btn_rect.center()) or QApplication.screenAt(QCursor.pos()) or QApplication.primaryScreen()
-        geom = screen.geometry()
-
-        # --- Horizontal placement (Left vs Right of Toolbar) ---
-        space_left = win_rect.left() - geom.left()
-        space_right = geom.right() - win_rect.right()
+        # --- Horizontal placement ---
+        space_left = btn_rect.left() - avail.left()
+        space_right = avail.right() - btn_rect.right()
 
         if space_left >= popup_w + gap:
-            # Default: Place cleanly to the LEFT of toolbar
-            target_x = win_rect.left() - popup_w - gap
+            # Default: Place to the LEFT of anchor
+            target_x = btn_rect.left() - popup_w - gap
         elif space_right >= popup_w + gap:
-            # Flip: Place cleanly to the RIGHT of toolbar
-            target_x = win_rect.right() + gap
+            # Flip: Place to the RIGHT of anchor
+            target_x = btn_rect.right() + gap
         else:
-            # Tight screen — clamp within screen
-            target_x = max(geom.left() + gap,
-                           min(geom.right() - popup_w - gap, win_rect.left() - popup_w - gap))
+            # Tight screen — clamp as best we can
+            target_x = max(avail.left() + gap,
+                           min(avail.right() - popup_w - gap, btn_rect.left() - popup_w - gap))
 
-        # --- Vertical placement: center on anchor button, clamp loosely ---
+        # --- Vertical placement: center on anchor, clamp to screen ---
         ideal_y = btn_rect.center().y() - popup_h // 2
-        
-        # We only want to ensure the top part (handle) doesn't go off the top edge entirely
-        # and doesn't get pushed completely below the screen. We don't restrict the whole height.
-        handle_h = 40
-        target_y = max(geom.top() - gap, min(geom.bottom() - handle_h, ideal_y))
+        target_y = max(avail.top() + gap,
+                       min(avail.bottom() - popup_h - gap, ideal_y))
 
         return QPoint(target_x, target_y)
 
@@ -604,19 +583,14 @@ class DragHandle(QWidget):
     def mouseMoveEvent(self, event):
         if self._drag_pos is not None:
             delta = event.globalPosition().toPoint() - self._drag_pos
-            parent = self.parent()
-            old_pos = parent.pos()
-            new_pos = clamp_handle_to_screen(self, old_pos + delta)
-            actual_delta = new_pos - old_pos
-
-            parent.move(new_pos)
+            self.parent().move(self.parent().pos() + delta)
             self._drag_pos = event.globalPosition().toPoint()
-            parent.has_been_dragged = True
-
+            self.parent().has_been_dragged = True
+            
             # ONLY the main toolbar emits toolbar_moved to move attached sub-panels
-            if parent.__class__.__name__ == 'ToolbarWindow':
-                if hasattr(parent, 'signals') and hasattr(parent.signals, 'toolbar_moved'):
-                    parent.signals.toolbar_moved.emit(actual_delta)
+            if self.parent().__class__.__name__ == 'ToolbarWindow':
+                if hasattr(self.parent(), 'signals') and hasattr(self.parent().signals, 'toolbar_moved'):
+                    self.parent().signals.toolbar_moved.emit(delta)
             event.accept()
 
     def mouseReleaseEvent(self, event):
@@ -1896,19 +1870,18 @@ class ToolbarWindow(QWidget):
         for label, size in zip(["Mini", "Small", "Medium", "Big", "Large"], sizes):
             menu.addAction(label, lambda checked=False, s=size: signal_emitter(s))
         def _show_size_menu(b=btn, m=menu):
+            # Smart position: prefer right of button, clamp to screen
             btn_global = b.mapToGlobal(QPoint(0, 0))
             btn_rect = QRect(btn_global, b.size())
-            win = b.window()
-            win_rect = win.geometry() if win else btn_rect
-            screen = QApplication.screenAt(btn_rect.center()) or QApplication.screenAt(QCursor.pos()) or QApplication.primaryScreen()
-            geom = screen.geometry()
-
-            # Prefer right of toolbar, flip left if close to right screen edge
-            x = win_rect.right() + 5
-            if x + 120 > geom.right():
-                x = win_rect.left() - 120 - 5
-            x = max(geom.left() + 5, x)
-            y = max(geom.top() + 5, min(geom.bottom() - 100, btn_rect.top()))
+            screen = QApplication.screenAt(btn_rect.center()) or QApplication.primaryScreen()
+            avail = screen.availableGeometry()
+            # Prefer right of button
+            x = btn_rect.right() + 5
+            if x + 120 > avail.right():  # 120px estimated menu width
+                x = btn_rect.left() - 120 - 5
+            x = max(avail.left() + 5, x)
+            y = btn_rect.top()
+            y = max(avail.top() + 5, min(avail.bottom() - 100, y))
             m.exec(QPoint(x, y))
         btn.hold_triggered.connect(_show_size_menu)
 
@@ -2024,9 +1997,6 @@ class ToolbarWindow(QWidget):
 
         current_h = self.height()
         target_h = self._full_height or 557
-        
-        # We no longer restrict the expanded toolbar from going off the bottom of the screen.
-        # This allows the user to leave the pill handle near the taskbar.
 
         # Ensure collapsible widgets remain hidden during the height transition
         for w in self._collapsible_widgets:
@@ -2340,17 +2310,9 @@ class MainAppCoordinator(QObject):
 
     def _sync_toolboxes_position(self, delta):
         if not self.color_palette.has_been_dragged:
-            if self.color_palette._fade_state in (1, 2):
-                pos = FloatingPanel._smart_position(self.color_palette, self.toolbar.btn_palette)
-                self.color_palette.move(pos)
-            else:
-                self.color_palette.move(self.color_palette.pos() + delta)
+            self.color_palette.move(self.color_palette.pos() + delta)
         if not self.shape_toolbox.has_been_dragged:
-            if self.shape_toolbox._fade_state in (1, 2):
-                pos = FloatingPanel._smart_position(self.shape_toolbox, self.toolbar.btn_shape)
-                self.shape_toolbox.move(pos)
-            else:
-                self.shape_toolbox.move(self.shape_toolbox.pos() + delta)
+            self.shape_toolbox.move(self.shape_toolbox.pos() + delta)
 
     def toggle_color_palette(self):
         if self.color_palette._fade_state in (1, 2):
@@ -2375,16 +2337,15 @@ class MainAppCoordinator(QObject):
             self.shape_toolbox.fade_in()
 
     def _clamp_to_screen(self, panel):
-        """If a user-dragged panel has gone off-screen, clamp its handle back inside.
+        """If a user-dragged panel has gone off-screen, clamp it back inside.
         Returns True if clamping was applied."""
-        if not hasattr(panel, 'btn_handle'):
-            return False
-            
-        old_pos = panel.pos()
-        new_pos = clamp_handle_to_screen(panel.btn_handle, old_pos)
-        
-        if new_pos != old_pos:
-            panel.move(new_pos)
+        center = panel.geometry().center()
+        screen = QApplication.screenAt(center) or QApplication.primaryScreen()
+        avail = screen.availableGeometry()
+        x = max(avail.left() + 5, min(avail.right() - panel.width() - 5, panel.x()))
+        y = max(avail.top() + 5, min(avail.bottom() - panel.height() - 5, panel.y()))
+        if QPoint(x, y) != panel.pos():
+            panel.move(x, y)
             return True
         return False
 
