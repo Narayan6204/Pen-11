@@ -660,6 +660,10 @@ class OverlayWindow(QMainWindow):
         self.drawing = False
         self.undo_stack_size = 0
 
+        # Two-layer canvas cache (O(1) rendering)
+        self.canvas_cache = None
+        self._init_canvas_cache()
+
         # Pen tablet support
         self._tablet_pressure = 1.0     # Current pressure (1.0 = full/mouse)
         self._tablet_active = False     # True while stylus is in contact
@@ -819,6 +823,7 @@ class OverlayWindow(QMainWindow):
             for idx in self.selected_path_indices:
                 if idx < len(self.paths):
                     self.paths[idx]['pen'].setColor(QColor(hex_color))
+            self._rebake_cache()
             self.update()
             return
 
@@ -1066,7 +1071,52 @@ class OverlayWindow(QMainWindow):
         
         return rot_center, del_center, scale_center
 
-    # ── Cache management (Removed for Pure Vector Rendering) ──
+    # ── Cache management (Two-Layer O(1) Accelerated Engine) ──
+
+    def _init_canvas_cache(self):
+        size = self.size()
+        if size.width() <= 0 or size.height() <= 0:
+            size = QSize(1920, 1080)
+        self.canvas_cache = QPixmap(size)
+        self.canvas_cache.fill(Qt.GlobalColor.transparent)
+        self._rebake_cache()
+
+    def resizeEvent(self, event):
+        super().resizeEvent(event)
+        size = self.size()
+        if size.width() > 0 and size.height() > 0:
+            self.canvas_cache = QPixmap(size)
+            self.canvas_cache.fill(Qt.GlobalColor.transparent)
+            self._rebake_cache()
+
+    def _rebake_cache(self, exclude_indices=None):
+        if not self.canvas_cache or self.canvas_cache.isNull():
+            return
+        self.canvas_cache.fill(Qt.GlobalColor.transparent)
+        painter = QPainter(self.canvas_cache)
+        painter.setRenderHint(QPainter.RenderHint.Antialiasing)
+        painter.setRenderHint(QPainter.RenderHint.SmoothPixmapTransform)
+
+        exclude_set = set(exclude_indices) if exclude_indices else set()
+
+        for i, p in enumerate(self.paths):
+            if i not in exclude_set and p['mode'] != ToolMode.ERASER:
+                self._draw_stroke(painter, p['path'], p['pen'], p['mode'],
+                                  p.get('points'), p.get('pressures'))
+        painter.end()
+
+    def _bake_stroke_to_cache(self, stroke):
+        if not self.canvas_cache or self.canvas_cache.isNull():
+            return
+        if stroke['mode'] == ToolMode.ERASER:
+            return
+        painter = QPainter(self.canvas_cache)
+        painter.setRenderHint(QPainter.RenderHint.Antialiasing)
+        painter.setRenderHint(QPainter.RenderHint.SmoothPixmapTransform)
+        self._draw_stroke(painter, stroke['path'], stroke['pen'], stroke['mode'],
+                          stroke.get('points'), stroke.get('pressures'))
+        painter.end()
+
     # ── Tablet & Mouse events ──
 
     def tabletEvent(self, event):
@@ -1134,6 +1184,7 @@ class OverlayWindow(QMainWindow):
                             dy = event.position().y() - center.y()
                             dx = event.position().x() - center.x()
                             self.selection_rotation_start_angle = math.atan2(dy, dx)
+                            self._rebake_cache(exclude_indices=self.selected_path_indices)
                             return
                             
                         elif min_dist == d_del:
@@ -1144,6 +1195,7 @@ class OverlayWindow(QMainWindow):
                             self.selected_path_indices.clear()
                             self._recalculate_master_obb()
                             self.undo_stack_size = min(self.undo_stack_size, len(self.paths))
+                            self._rebake_cache()
                             self.update()
                             return
                             
@@ -1153,6 +1205,7 @@ class OverlayWindow(QMainWindow):
                             self.selection_start_master_obb = QPolygonF(self.master_obb)
                             self.selection_start_states = [{'path': QPainterPath(self.paths[idx]['path']), 'obb': QPolygonF(self.paths[idx].get('obb', QPolygonF(self.paths[idx]['path'].boundingRect()))), 'index': idx, 'pen_width': self.paths[idx]['pen'].widthF()} for idx in self.selected_path_indices if idx < len(self.paths)]
                             self.selection_start_center = QPointF((self.master_obb.at(0).x() + self.master_obb.at(2).x()) / 2, (self.master_obb.at(0).y() + self.master_obb.at(2).y()) / 2)
+                            self._rebake_cache(exclude_indices=self.selected_path_indices)
                             return
                         
                     elif self.master_obb.boundingRect().contains(event.position()):
@@ -1160,6 +1213,7 @@ class OverlayWindow(QMainWindow):
                         self.selection_start_pos = event.position()
                         self.selection_start_master_obb = QPolygonF(self.master_obb)
                         self.selection_start_states = [{'path': QPainterPath(self.paths[idx]['path']), 'obb': QPolygonF(self.paths[idx].get('obb', QPolygonF(self.paths[idx]['path'].boundingRect()))), 'index': idx} for idx in self.selected_path_indices if idx < len(self.paths)]
+                        self._rebake_cache(exclude_indices=self.selected_path_indices)
                         return
                 
                 # 2. Check if clicked on a path directly
@@ -1184,6 +1238,7 @@ class OverlayWindow(QMainWindow):
                     self.selection_action = 'drag'
                     self.selection_start_pos = event.position()
                     self.selection_start_states = [{'path': QPainterPath(self.paths[idx]['path']), 'obb': QPolygonF(self.paths[idx].get('obb', QPolygonF(self.paths[idx]['path'].boundingRect()))), 'index': idx} for idx in self.selected_path_indices if idx < len(self.paths)]
+                    self._rebake_cache(exclude_indices=self.selected_path_indices)
                 else:
                     # Clicked empty space -> start lasso
                     self.selected_path_indices.clear()
@@ -1340,6 +1395,8 @@ class OverlayWindow(QMainWindow):
                     self.lasso_path = None
                     self.update()
                 
+                if self.selection_action in ('drag', 'rotate', 'scale'):
+                    self._rebake_cache()
                 self.selection_action = None
                 return
 
@@ -1354,8 +1411,10 @@ class OverlayWindow(QMainWindow):
                 if self.mode != ToolMode.SHAPE and not self.shape_detected:
                     self.current_path.lineTo(event.position())
 
+                popped_oldest = False
                 if len(self.paths) >= self.MAX_STROKES:
                     self.paths.pop(0)
+                    popped_oldest = True
                     # Shift selected indices down by 1; remove any that pointed to the deleted stroke
                     self.selected_path_indices = [
                         idx - 1 for idx in self.selected_path_indices if idx > 0
@@ -1374,6 +1433,11 @@ class OverlayWindow(QMainWindow):
                     stroke['pressures'] = list(self.raw_pressures)
                 self.paths.append(stroke)
                 self.undo_stack_size = min(self.MAX_UNDO_STEPS, self.undo_stack_size + 1)
+
+                if popped_oldest:
+                    self._rebake_cache()
+                else:
+                    self._bake_stroke_to_cache(stroke)
 
                 self.current_path = None
                 self.update()
@@ -1426,6 +1490,7 @@ class OverlayWindow(QMainWindow):
 
         if removed:
             self.undo_stack_size = min(self.undo_stack_size, len(self.paths))
+            self._rebake_cache()
             self.update()
 
     # ── Shape detection ──
@@ -1485,12 +1550,19 @@ class OverlayWindow(QMainWindow):
         painter.setRenderHint(QPainter.RenderHint.Antialiasing)
         painter.setRenderHint(QPainter.RenderHint.SmoothPixmapTransform)
 
-        # Pure Vector Rendering: Draw all saved paths dynamically
-        for p in self.paths:
-            if p['mode'] != ToolMode.ERASER:
-                self._draw_stroke(painter, p['path'], p['pen'], p['mode'],
-                                  p.get('points'), p.get('pressures'))
+        # 1. Blit cached background strokes (O(1) instant GPU blit)
+        if self.canvas_cache and not self.canvas_cache.isNull():
+            painter.drawPixmap(0, 0, self.canvas_cache)
+
+        # 2. Draw live actively transforming selected paths in SELECT mode
+        if self.mode == ToolMode.SELECT and self.selection_action in ('drag', 'rotate', 'scale') and self.selected_path_indices:
+            for idx in self.selected_path_indices:
+                if idx < len(self.paths):
+                    p = self.paths[idx]
+                    self._draw_stroke(painter, p['path'], p['pen'], p['mode'],
+                                      p.get('points'), p.get('pressures'))
         
+        # 3. Draw live active stroke
         if self.drawing and self.current_path:
             self._draw_stroke(painter, self.current_path, self._get_current_pen(), self.mode,
                               self.raw_points if self.raw_points else None,
@@ -1578,6 +1650,7 @@ class OverlayWindow(QMainWindow):
                 self.selected_path_indices.clear()
                 self._recalculate_master_obb()
                 self.undo_stack_size = min(self.undo_stack_size, len(self.paths))
+                self._rebake_cache()
                 self.update()
                 return
         super().keyPressEvent(event)
@@ -1589,6 +1662,7 @@ class OverlayWindow(QMainWindow):
         self.undo_stack_size = 0
         self.selected_path_indices.clear()
         self._recalculate_master_obb()
+        self._rebake_cache()
         self.update()
 
     def undo(self):
@@ -1597,6 +1671,7 @@ class OverlayWindow(QMainWindow):
             self.undo_stack_size -= 1
             self.selected_path_indices = [idx for idx in self.selected_path_indices if idx < len(self.paths)]
             self._recalculate_master_obb()
+            self._rebake_cache()
             self.update()
 
 
