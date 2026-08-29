@@ -362,41 +362,48 @@ class FloatingPanel(QWidget):
         """Calculate the best screen position for popup_widget anchored to anchor_widget.
         
         Rules:
-        1. Prefer left of anchor. Flip to right if no room.
-        2. Vertically center popup on the anchor button.
-        3. Clamp within the active screen's available geometry (avoids taskbar).
-        4. Works correctly on multi-monitor setups.
+        1. Use the outer ToolbarWindow edge for horizontal placement so popup never overlaps the toolbar.
+        2. Prefer LEFT of toolbar. Flip to RIGHT if no room.
+        3. Vertically center popup on the anchor button, clamped to available screen area.
+        4. Use sizeHint() for accurate dimensions even when the widget hasn't been shown yet.
+        5. Works correctly on multi-monitor setups.
         
         Returns: QPoint with the ideal top-left position for the popup.
         """
-        popup_widget.adjustSize()
-        popup_w = popup_widget.width()
-        popup_h = popup_widget.height()
+        # Use sizeHint() for accurate size — adjustSize() on hidden widgets is unreliable
+        hint = popup_widget.sizeHint()
+        popup_w = max(hint.width(), popup_widget.width(), 160)
+        popup_h = max(hint.height(), popup_widget.height(), 50)
 
-        # Map anchor widget's top-left to global screen coordinates
+        # Map anchor button's top-left to global screen coordinates
         btn_global = anchor_widget.mapToGlobal(QPoint(0, 0))
         btn_rect = QRect(btn_global, anchor_widget.size())
+
+        # Use the outer toolbar window edge so popup is flush against the toolbar,
+        # not just the button (avoids overlapping the toolbar body)
+        anchor_win = anchor_widget.window()
+        win_rect = anchor_win.geometry() if anchor_win else btn_rect
 
         # Find the active screen that contains the anchor button center
         screen = QApplication.screenAt(btn_rect.center()) or QApplication.primaryScreen()
         avail = screen.availableGeometry()  # excludes taskbar automatically
 
-        # --- Horizontal placement ---
-        space_left = btn_rect.left() - avail.left()
-        space_right = avail.right() - btn_rect.right()
+        # --- Horizontal placement: measure from toolbar window edge ---
+        space_left = win_rect.left() - avail.left()
+        space_right = avail.right() - win_rect.right()
 
         if space_left >= popup_w + gap:
-            # Default: Place to the LEFT of anchor
-            target_x = btn_rect.left() - popup_w - gap
+            # Default: flush against the LEFT side of the toolbar
+            target_x = win_rect.left() - popup_w - gap
         elif space_right >= popup_w + gap:
-            # Flip: Place to the RIGHT of anchor
-            target_x = btn_rect.right() + gap
+            # Flip: flush against the RIGHT side of the toolbar
+            target_x = win_rect.right() + gap
         else:
-            # Tight screen — clamp as best we can
+            # Very tight screen — best effort placement
             target_x = max(avail.left() + gap,
-                           min(avail.right() - popup_w - gap, btn_rect.left() - popup_w - gap))
+                           min(avail.right() - popup_w - gap, win_rect.left() - popup_w - gap))
 
-        # --- Vertical placement: center on anchor, clamp to screen ---
+        # --- Vertical placement: center on anchor button, clamp to screen ---
         ideal_y = btn_rect.center().y() - popup_h // 2
         target_y = max(avail.top() + gap,
                        min(avail.bottom() - popup_h - gap, ideal_y))
