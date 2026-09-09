@@ -2,6 +2,25 @@
 
 ---
 
+## Session - 2026-09-09 23:25 IST (Comprehensive README.md Update)
+
+### What Was Done
+- Overhauled and expanded `README.md` to showcase the modern capabilities of Pen 11.
+- Documented key newly-added features:
+  - Pen Tablet & Stylus Support: Native pressure-sensitive variable-width strokes, automatic stylus eraser-end flip (`tabletEvent()`), duplicate synthetic event suppression.
+  - Smart Screen-Edge Aware Popups: Screen boundary detection, multi-monitor safety, taskbar avoidance with automatic left/right flip (`_smart_position()`).
+  - Two-Layer Backing Cache Engine: Off-screen cached vector drawing ($O(1)$ GPU blit) delivering 60 FPS performance with 50,000+ strokes, high-DPI backing store sync.
+- Added comprehensive 'Pen 11 vs. Epic Pen vs. gInk' feature comparison table.
+- Added detailed real-world Use Cases (Educators, Developers, Presenters/Creators).
+- Added Quick Start Guide & Expanded FAQs (Tablets, Multi-monitor, Zero-install & uninstallation, 50k+ stroke cache).
+- Added live web demo badge and link (`https://pen-11.pages.dev/`), plus direct GitHub issue links for bugs and feature requests.
+- Preserved original story, screenshots, and donation section intact.
+
+### Confidence Level
+- MAXIMUM — File updated, verified, and formatted with clean Markdown tables, badges, and anchors.
+
+---
+
 ## Session - 2026-09-05 19:06 IST (Fix Post-Caching Rendering Regression — 6 Surgical Fixes)
 
 ### What Was Done

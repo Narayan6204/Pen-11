@@ -47,12 +47,12 @@
   <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:ital,wght@0,300..800;1,300..800&family=Roboto+Flex:opsz,wght,GRAD,slnt@8..144,100..1000,-200..150,-10..0&family=Roboto+Mono:wght@400;500;600;700&family=Material+Symbols+Rounded:opsz,wght,FILL,GRAD@20..48,100..700,0..1,-50..200&display=swap">
 
   <!-- Stylesheets -->
-  <link rel="stylesheet" href="css/00-tokens.css?v=4.5.7">
-  <link rel="stylesheet" href="css/01-layout.css?v=4.5.7">
-  <link rel="stylesheet" href="css/02-components.css?v=4.5.7">
-  <link rel="stylesheet" href="css/03-motion.css?v=4.5.7">
-  <link rel="stylesheet" href="css/04-canvas.css?v=4.5.7">
-  <link rel="stylesheet" href="css/05-warm-theme.css?v=4.5.7">
+  <link rel="stylesheet" href="css/00-tokens.css?v=4.5.8">
+  <link rel="stylesheet" href="css/01-layout.css?v=4.5.8">
+  <link rel="stylesheet" href="css/02-components.css?v=4.5.8">
+  <link rel="stylesheet" href="css/03-motion.css?v=4.5.8">
+  <link rel="stylesheet" href="css/04-canvas.css?v=4.5.8">
+  <link rel="stylesheet" href="css/05-warm-theme.css?v=4.5.8">
 
   <!-- Immediate Theme Resolver to Prevent FOUT and Desync -->
   <script>
@@ -129,22 +129,54 @@
       },
       {
         "@type": "FAQPage",
-        "@id": "https://narayan6204.github.io/Pen-11/#faq",
+        "@id": "https://pen-11.pages.dev/#faq",
         "mainEntity": [
+          {
+            "@type": "Question",
+            "name": "Which graphics tablets, styluses, and digital pens are supported?",
+            "acceptedAnswer": {
+              "@type": "Answer",
+              "text": "Pen 11 provides native hardware-level support for Wacom, Huion, XP-Pen, Gaomon, and Microsoft Surface Pen with raw pressure sensitivity and automatic eraser-end flipping."
+            }
+          },
+          {
+            "@type": "Question",
+            "name": "How does multi-monitor support work across different display resolutions?",
+            "acceptedAnswer": {
+              "@type": "Answer",
+              "text": "Pen 11 spans your entire virtual desktop across multiple monitors, with smart screen-edge aware positioning that auto-flips palettes to prevent taskbar occlusion."
+            }
+          },
+          {
+            "@type": "Question",
+            "name": "How do I completely uninstall Pen 11 and remove configuration files?",
+            "acceptedAnswer": {
+              "@type": "Answer",
+              "text": "Pen 11 is 100% portable with zero Windows Registry modifications. Simply delete Pen 11.exe and optionally clear %APPDATA%\\Pen11\\."
+            }
+          },
+          {
+            "@type": "Question",
+            "name": "Can I draw over fullscreen applications, games, and presentation slideshows?",
+            "acceptedAnswer": {
+              "@type": "Answer",
+              "text": "Yes. Pen 11 uses non-activating overlay windows (WS_EX_NOACTIVATE) to annotate smoothly over PowerPoint, PDFs, Zoom/Teams, and borderless games without stealing window focus."
+            }
+          },
+          {
+            "@type": "Question",
+            "name": "Will Pen 11 lag during long drawing sessions or complex diagrams?",
+            "acceptedAnswer": {
+              "@type": "Answer",
+              "text": "No. The Two-Layer Accelerated Backing Cache renders completed strokes in an off-screen GPU buffer, keeping rendering locked at 60 FPS across 50,000+ strokes."
+            }
+          },
           {
             "@type": "Question",
             "name": "Is Pen 11 completely free and open-source?",
             "acceptedAnswer": {
               "@type": "Answer",
               "text": "Yes, Pen 11 is 100% free and open-source under the MIT license with no ads, paywalls, or telemetry."
-            }
-          },
-          {
-            "@type": "Question",
-            "name": "What operating systems are supported by Pen 11?",
-            "acceptedAnswer": {
-              "@type": "Answer",
-              "text": "Pen 11 is natively optimized for 64-bit Windows 11 and Windows 10 with Direct3D 11 support."
             }
           },
           {
@@ -188,8 +220,10 @@
         <!-- Desktop Navigation Links -->
         <nav class="m3-top-app-bar-nav" role="navigation" aria-label="Primary Navigation">
           <a href="#hero" class="m3-btn m3-btn-text">Sandbox</a>
+          <a href="#quickstart" class="m3-btn m3-btn-text">Quick Start</a>
           <a href="#gallery" class="m3-btn m3-btn-text">Gallery</a>
           <a href="#features" class="m3-btn m3-btn-text">Features</a>
+          <a href="#comparison" class="m3-btn m3-btn-text">Compare</a>
           <a href="#benchmarks" class="m3-btn m3-btn-text">Benchmarks</a>
           <a href="#hotkeys" class="m3-btn m3-btn-text">Shortcuts</a>
           <a href="#developers" class="m3-btn m3-btn-text">Developers</a>
@@ -463,6 +497,91 @@
         </div>
       </section>
 
+      <!-- Quick Start Guide (3 Simple Steps) -->
+      <section id="quickstart" class="m3-section" aria-labelledby="quickstart-title">
+        <div class="m3-container">
+          
+          <div style="text-align: center; max-width: 720px; margin: 0 auto 48px;">
+            <span class="m3-badge-pill" style="margin-bottom: 12px;">30-SECOND SETUP</span>
+            <h2 id="quickstart-title" class="m3-headline-large" style="color: var(--md-sys-color-on-surface); margin-bottom: 12px; font-weight: 800;">
+              Get Started in 3 Simple Steps
+            </h2>
+            <p class="m3-body-large">
+              No installers, no setup wizards, no registry modifications, and zero administrator privileges required.
+            </p>
+          </div>
+
+          <!-- 3 Steps Bento Grid -->
+          <div class="bento-grid">
+            
+            <!-- Step 1 Card -->
+            <article class="bento-card bento-col-4" style="display: flex; flex-direction: column; justify-content: space-between;">
+              <div>
+                <div class="bento-card-header">
+                  <div class="bento-card-icon">
+                    <span class="material-symbols-rounded">download</span>
+                  </div>
+                  <span class="m3-badge-pill" style="font-weight: 700;">STEP 1</span>
+                </div>
+                <h3 class="bento-card-title">Download &amp; Launch</h3>
+                <p class="bento-card-description" style="margin-bottom: 16px;">
+                  Download the portable standalone <code class="m3-kbd">Pen 11.exe</code> (<span data-gh-size>38.6 MB</span>). Double-click to launch immediately—runs 100% locally with zero background services.
+                </p>
+              </div>
+              <div style="margin-top: 12px;">
+                <button type="button" class="m3-btn m3-btn-tonal btn-download-popup-trigger" style="width: 100%; justify-content: center; gap: 8px; cursor: pointer;" aria-haspopup="dialog" aria-expanded="false">
+                  <span class="material-symbols-rounded" style="font-size: 18px;">download</span>
+                  <span>Get Pen 11 Free</span>
+                </button>
+              </div>
+            </article>
+
+            <!-- Step 2 Card -->
+            <article class="bento-card bento-col-4" style="display: flex; flex-direction: column; justify-content: space-between;">
+              <div>
+                <div class="bento-card-header">
+                  <div class="bento-card-icon">
+                    <span class="material-symbols-rounded">draw</span>
+                  </div>
+                  <span class="m3-badge-pill" style="font-weight: 700;">STEP 2</span>
+                </div>
+                <h3 class="bento-card-title">Draw with Ctrl+1</h3>
+                <p class="bento-card-description" style="margin-bottom: 16px;">
+                  Annotate, sketch, or highlight directly over PowerPoint slides, code editors, or browser tabs with zero window focus stealing and Direct3D 11 sub-millisecond response.
+                </p>
+              </div>
+              <div class="m3-flex-row m3-gap-xs" style="flex-wrap: wrap; margin-top: 12px;">
+                <span class="m3-badge-pill" style="font-size: 12px; padding: 4px 10px;"><kbd>Ctrl</kbd>+<kbd>1</kbd> Pen</span>
+                <span class="m3-badge-pill" style="font-size: 12px; padding: 4px 10px;"><kbd>Ctrl</kbd>+<kbd>2</kbd> Highlighter</span>
+                <span class="m3-badge-pill" style="font-size: 12px; padding: 4px 10px;"><kbd>Ctrl</kbd>+<kbd>3</kbd> Eraser</span>
+              </div>
+            </article>
+
+            <!-- Step 3 Card -->
+            <article class="bento-card bento-col-4" style="display: flex; flex-direction: column; justify-content: space-between;">
+              <div>
+                <div class="bento-card-header">
+                  <div class="bento-card-icon">
+                    <span class="material-symbols-rounded">visibility</span>
+                  </div>
+                  <span class="m3-badge-pill" style="font-weight: 700;">STEP 3</span>
+                </div>
+                <h3 class="bento-card-title">Toggle with Ctrl+5</h3>
+                <p class="bento-card-description" style="margin-bottom: 16px;">
+                  Press <kbd>Ctrl</kbd>+<kbd>5</kbd> to toggle ink visibility and glide the toolbar into an unobtrusive pill handle. Press <kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>C</kbd> to wipe all annotations clean instantly.
+                </p>
+              </div>
+              <div class="m3-flex-row m3-gap-xs" style="flex-wrap: wrap; margin-top: 12px;">
+                <span class="m3-badge-pill" style="font-size: 12px; padding: 4px 10px;"><kbd>Ctrl</kbd>+<kbd>5</kbd> Toggle Pill</span>
+                <span class="m3-badge-pill" style="font-size: 12px; padding: 4px 10px;"><kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>C</kbd> Clear</span>
+              </div>
+            </article>
+
+          </div>
+
+        </div>
+      </section>
+
       <!-- 3. Native Desktop UI Showcase Gallery -->
       <section id="gallery" class="m3-section" aria-labelledby="gallery-title">
         <div class="m3-container">
@@ -648,6 +767,118 @@
         </div>
       </section>
 
+      <!-- Workflows & Target Use Cases Section -->
+      <section id="workflows" class="m3-section" aria-labelledby="workflows-title">
+        <span id="use-cases" style="position: absolute; margin-top: -80px;"></span>
+        <div class="m3-container">
+          
+          <div style="text-align: center; max-width: 760px; margin: 0 auto 48px;">
+            <span class="m3-badge-pill" style="margin-bottom: 12px;">TAILORED FOR PROFESSIONALS</span>
+            <h2 id="workflows-title" class="m3-headline-large" style="color: var(--md-sys-color-on-surface); margin-bottom: 12px; font-weight: 800;">
+              Engineered for Your Workflow
+            </h2>
+            <p class="m3-body-large">
+              Whether you are teaching a classroom, conducting code reviews, or delivering a keynote, Pen 11 adapts effortlessly.
+            </p>
+          </div>
+
+          <div class="bento-grid">
+            
+            <!-- Use Case 1: Educators & Teachers -->
+            <article class="bento-card bento-col-4" style="display: flex; flex-direction: column; justify-content: space-between;">
+              <div>
+                <div class="bento-card-header">
+                  <div class="bento-card-icon">
+                    <span class="material-symbols-rounded">school</span>
+                  </div>
+                  <span class="m3-badge-pill">EDUCATION</span>
+                </div>
+                <h3 class="bento-card-title">Educators &amp; Teachers</h3>
+                <p class="bento-card-description" style="margin-bottom: 20px;">
+                  Annotate PowerPoint slides, digital textbooks, PDFs, and virtual classroom calls in real-time. Switch to Whiteboard / Blackboard mode (<kbd>Ctrl</kbd>+<kbd>B</kbd>) for step-by-step math derivations, cursive handwriting, and diagram sketches with full stylus pressure sensitivity.
+                </p>
+              </div>
+              <ul style="list-style: none; padding: 0; margin: 0; display: flex; flex-direction: column; gap: 8px; border-top: 1px solid var(--md-sys-color-outline-variant); padding-top: 16px;">
+                <li class="m3-flex-row m3-gap-xs m3-align-center" style="font-size: 13px; color: var(--md-sys-color-on-surface);">
+                  <span class="material-symbols-rounded" style="font-size: 16px; color: #22c55e;">check_circle</span>
+                  <span>Whiteboard &amp; Blackboard modes (<kbd>Ctrl</kbd>+<kbd>B</kbd>)</span>
+                </li>
+                <li class="m3-flex-row m3-gap-xs m3-align-center" style="font-size: 13px; color: var(--md-sys-color-on-surface);">
+                  <span class="material-symbols-rounded" style="font-size: 16px; color: #22c55e;">check_circle</span>
+                  <span>Wacom &amp; Huion stylus pressure tapering</span>
+                </li>
+                <li class="m3-flex-row m3-gap-xs m3-align-center" style="font-size: 13px; color: var(--md-sys-color-on-surface);">
+                  <span class="material-symbols-rounded" style="font-size: 16px; color: #22c55e;">check_circle</span>
+                  <span>Flicker-free tooltips with zero focus-stealing</span>
+                </li>
+              </ul>
+            </article>
+
+            <!-- Use Case 2: Developers & Designers -->
+            <article class="bento-card bento-col-4" style="display: flex; flex-direction: column; justify-content: space-between;">
+              <div>
+                <div class="bento-card-header">
+                  <div class="bento-card-icon">
+                    <span class="material-symbols-rounded">terminal</span>
+                  </div>
+                  <span class="m3-badge-pill">ENGINEERING</span>
+                </div>
+                <h3 class="bento-card-title">Developers &amp; Designers</h3>
+                <p class="bento-card-description" style="margin-bottom: 20px;">
+                  Highlight code during pull request reviews, sketch architecture and data-flow diagrams during live pair programming, and circle bugs directly over running software without losing IDE focus. Group, rotate, and scale strokes with pure vector Oriented Bounding Box (OBB) selection.
+                </p>
+              </div>
+              <ul style="list-style: none; padding: 0; margin: 0; display: flex; flex-direction: column; gap: 8px; border-top: 1px solid var(--md-sys-color-outline-variant); padding-top: 16px;">
+                <li class="m3-flex-row m3-gap-xs m3-align-center" style="font-size: 13px; color: var(--md-sys-color-on-surface);">
+                  <span class="material-symbols-rounded" style="font-size: 16px; color: #22c55e;">check_circle</span>
+                  <span>Oriented Bounding Box (OBB) vector lasso</span>
+                </li>
+                <li class="m3-flex-row m3-gap-xs m3-align-center" style="font-size: 13px; color: var(--md-sys-color-on-surface);">
+                  <span class="material-symbols-rounded" style="font-size: 16px; color: #22c55e;">check_circle</span>
+                  <span>Hold 400ms to auto-snap geometric shapes</span>
+                </li>
+                <li class="m3-flex-row m3-gap-xs m3-align-center" style="font-size: 13px; color: var(--md-sys-color-on-surface);">
+                  <span class="material-symbols-rounded" style="font-size: 16px; color: #22c55e;">check_circle</span>
+                  <span>Zero focus-stealing over VS Code &amp; Terminals</span>
+                </li>
+              </ul>
+            </article>
+
+            <!-- Use Case 3: Business Presenters & Streamers -->
+            <article class="bento-card bento-col-4" style="display: flex; flex-direction: column; justify-content: space-between;">
+              <div>
+                <div class="bento-card-header">
+                  <div class="bento-card-icon">
+                    <span class="material-symbols-rounded">co_present</span>
+                  </div>
+                  <span class="m3-badge-pill">PRESENTATIONS</span>
+                </div>
+                <h3 class="bento-card-title">Business Presenters &amp; Streamers</h3>
+                <p class="bento-card-description" style="margin-bottom: 20px;">
+                  Guide audience focus during webinars and software demos using high-contrast translucent highlighters, auto-snapped arrows, and callouts. Collapse the toolbar to an unobtrusive pill (<kbd>Ctrl</kbd>+<kbd>5</kbd>) when recording clean screencasts or sharing screens on Zoom, Teams, and OBS.
+                </p>
+              </div>
+              <ul style="list-style: none; padding: 0; margin: 0; display: flex; flex-direction: column; gap: 8px; border-top: 1px solid var(--md-sys-color-outline-variant); padding-top: 16px;">
+                <li class="m3-flex-row m3-gap-xs m3-align-center" style="font-size: 13px; color: var(--md-sys-color-on-surface);">
+                  <span class="material-symbols-rounded" style="font-size: 16px; color: #22c55e;">check_circle</span>
+                  <span>Smooth 60 FPS cubic toolbar collapse (<kbd>Ctrl</kbd>+<kbd>5</kbd>)</span>
+                </li>
+                <li class="m3-flex-row m3-gap-xs m3-align-center" style="font-size: 13px; color: var(--md-sys-color-on-surface);">
+                  <span class="material-symbols-rounded" style="font-size: 16px; color: #22c55e;">check_circle</span>
+                  <span>Multi-monitor taskbar-safe auto-flipping</span>
+                </li>
+                <li class="m3-flex-row m3-gap-xs m3-align-center" style="font-size: 13px; color: var(--md-sys-color-on-surface);">
+                  <span class="material-symbols-rounded" style="font-size: 16px; color: #22c55e;">check_circle</span>
+                  <span>Sub-millisecond Direct3D 11 screen-share safe</span>
+                </li>
+              </ul>
+            </article>
+
+          </div>
+
+        </div>
+      </section>
+
       <!-- 4. Hardware Benchmarks & Performance Metrics -->
       <section id="benchmarks" class="m3-section" aria-labelledby="benchmarks-title">
         <div class="m3-container">
@@ -703,6 +934,114 @@
               <span class="material-symbols-rounded" style="font-size: 14px; color: var(--md-sys-color-primary);">check_circle</span>
               <span>Windows 11 / 10 (64-bit) • Min 50 MB RAM • Direct3D 11 • Portable Standalone</span>
             </span>
+          </div>
+
+        </div>
+      </section>
+
+      <!-- Comparison Table Section -->
+      <section id="comparison" class="m3-section" aria-labelledby="comparison-title">
+        <div class="m3-container">
+          
+          <div style="text-align: center; max-width: 760px; margin: 0 auto 48px;">
+            <span class="m3-badge-pill" style="margin-bottom: 12px;">HEAD-TO-HEAD BENCHMARK</span>
+            <h2 id="comparison-title" class="m3-headline-large" style="color: var(--md-sys-color-on-surface); margin-bottom: 12px; font-weight: 800;">
+              Pen 11 vs. Other Screen Markers
+            </h2>
+            <p class="m3-body-large">
+              See how Pen 11 delivers modern engineering, stylus fidelity, and 60 FPS performance without paywalls or bloat.
+            </p>
+          </div>
+
+          <div class="m3-table-container m3-table-scrollable">
+            <table class="m3-table" aria-label="Pen 11 Comparison with Epic Pen and gInk">
+              <thead>
+                <tr>
+                  <th style="width: 22%;">Feature</th>
+                  <th style="width: 32%; background-color: var(--md-sys-color-primary-container); color: var(--md-sys-color-on-primary-container);">
+                    <div class="m3-flex-row m3-align-center m3-gap-xs">
+                      <span style="font-size: 18px;">🖊️</span>
+                      <strong>Pen 11 (MIT)</strong>
+                      <span class="m3-badge-pill" style="font-size: 10px; padding: 2px 6px; margin-left: 4px; background: var(--md-sys-color-primary); color: #FAF6EC;">Our App</span>
+                    </div>
+                  </th>
+                  <th style="width: 23%;">
+                    <div class="m3-flex-row m3-align-center m3-gap-xs">
+                      <span style="font-size: 18px;">✏️</span>
+                      <strong>Epic Pen Free</strong>
+                    </div>
+                  </th>
+                  <th style="width: 23%;">
+                    <div class="m3-flex-row m3-align-center m3-gap-xs">
+                      <span style="font-size: 18px;">🖋️</span>
+                      <strong>gInk</strong>
+                    </div>
+                  </th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr>
+                  <td><strong>Price &amp; License</strong></td>
+                  <td style="background-color: rgba(124, 92, 53, 0.05); font-weight: 700; color: var(--md-sys-color-primary);">100% Free &amp; Open Source (MIT)</td>
+                  <td>Free (Crippled) / <span style="color: var(--md-sys-color-error); font-weight: 600;">$25+ Pro Paywall</span></td>
+                  <td>Free &amp; Open Source (GPL)</td>
+                </tr>
+                <tr>
+                  <td><strong>UI &amp; Design System</strong></td>
+                  <td style="background-color: rgba(124, 92, 53, 0.05); font-weight: 600;">Modern Windows 11 Fluent / M3 Pill UI with 60 FPS cubic animations</td>
+                  <td>Outdated legacy Win32 UI, rigid window frame</td>
+                  <td>Barebones WinForms / GDI+ UI</td>
+                </tr>
+                <tr>
+                  <td><strong>Pen Tablet &amp; Stylus</strong></td>
+                  <td style="background-color: rgba(124, 92, 53, 0.05); font-weight: 600;">Native pressure sensitivity &amp; auto stylus eraser flip (<code class="m3-kbd">tabletEvent</code>)</td>
+                  <td>Stylus pressure locked behind paid Pro</td>
+                  <td>Basic Wintab/stylus support, no auto-eraser flip</td>
+                </tr>
+                <tr>
+                  <td><strong>Rendering Architecture</strong></td>
+                  <td style="background-color: rgba(124, 92, 53, 0.05); font-weight: 600;">Two-Layer Backing Cache (<span style="font-family: var(--md-sys-typescale-font-mono);">O(1)</span> GPU blit) — 50k+ strokes @ 60 FPS</td>
+                  <td><span style="font-family: var(--md-sys-typescale-font-mono);">O(N)</span> redraw loop; stutters under heavy drawing</td>
+                  <td>GDI+ CPU redraw loop; noticeable lag on dense drawings</td>
+                </tr>
+                <tr>
+                  <td><strong>Vector Selection &amp; Lasso</strong></td>
+                  <td style="background-color: rgba(124, 92, 53, 0.05); font-weight: 600;">Oriented Bounding Box (OBB): drag, rotate, scale, and delete</td>
+                  <td>None in Free version (basic moves in Pro)</td>
+                  <td>None (bitmap-style clear/undo only)</td>
+                </tr>
+                <tr>
+                  <td><strong>Geometric Auto-Snap</strong></td>
+                  <td style="background-color: rgba(124, 92, 53, 0.05); font-weight: 600;">Hold 400ms for instant geometric snapping (lines, circles, etc.)</td>
+                  <td>Manual shapes locked behind paid Pro</td>
+                  <td>Rudimentary shapes, no gesture detection</td>
+                </tr>
+                <tr>
+                  <td><strong>Edge &amp; Taskbar Safety</strong></td>
+                  <td style="background-color: rgba(124, 92, 53, 0.05); font-weight: 600;">Smart screen-edge detection (<code class="m3-kbd">_smart_position</code>) with auto-flip</td>
+                  <td>Basic dock snapping; frequently occluded by taskbar</td>
+                  <td>Fixed positioning; can overflow display edges</td>
+                </tr>
+                <tr>
+                  <td><strong>Memory &amp; Idle CPU</strong></td>
+                  <td style="background-color: rgba(124, 92, 53, 0.05); font-weight: 600;">&lt; 50 MB RAM, 0.0% idle CPU (Direct3D 11 hardware DWM)</td>
+                  <td>80–150 MB RAM, background helper services</td>
+                  <td>~40–60 MB RAM, software rasterized</td>
+                </tr>
+                <tr>
+                  <td><strong>Installation &amp; Portability</strong></td>
+                  <td style="background-color: rgba(124, 92, 53, 0.05); font-weight: 600;">100% Portable single <code class="m3-kbd">.exe</code> (Zero registry clutter)</td>
+                  <td>Windows installer (<code class="m3-kbd">.msi</code>/<code class="m3-kbd">.exe</code>) required</td>
+                  <td>Portable zip</td>
+                </tr>
+                <tr>
+                  <td><strong>Interactive Web Companion</strong></td>
+                  <td style="background-color: rgba(124, 92, 53, 0.05); font-weight: 600;"><a href="https://pen-11.pages.dev/" target="_blank" rel="noopener noreferrer" style="color: var(--md-sys-color-primary); font-weight: 700; text-decoration: underline;">Live Web Sandbox Demo</a></td>
+                  <td>None</td>
+                  <td>None</td>
+                </tr>
+              </tbody>
+            </table>
           </div>
 
         </div>
@@ -800,7 +1139,7 @@ pip install -r requirements.txt
 python main.py
 
 <span style="color: #60cdff;"># 4. Compile optimized standalone executable</span>
-python -m PyInstaller main.spec --noconfirm</code></pre>
+python -m PyInstaller "Pen 11.spec" --noconfirm</code></pre>
             </div>
 
             <!-- Architecture Breakdown -->
@@ -857,6 +1196,43 @@ python -m PyInstaller main.spec --noconfirm</code></pre>
         </div>
       </section>
 
+      <!-- Community & Direct GitHub Contribution Actions -->
+      <section id="community" class="m3-section" style="padding-top: 0;" aria-labelledby="community-title">
+        <div class="m3-container">
+          
+          <div class="m3-card" style="padding: 28px 32px; border-radius: var(--md-sys-shape-corner-extra-large); background: var(--md-sys-color-surface-container); border: 1px solid var(--md-sys-color-outline-variant); width: 100%;">
+            <div class="m3-flex-row m3-justify-between m3-align-center" style="flex-wrap: wrap; gap: 24px;">
+              <div style="text-align: left; max-width: 540px;">
+                <div class="m3-flex-row m3-align-center m3-gap-xs" style="margin-bottom: 6px;">
+                  <span class="m3-badge-pill" style="font-size: 11px;">COMMUNITY &amp; FEEDBACK</span>
+                </div>
+                <h3 id="community-title" class="m3-title-medium" style="margin-bottom: 6px; color: var(--md-sys-color-on-surface); font-weight: 800; font-size: 1.25rem;">
+                  Shape the Future of Pen 11
+                </h3>
+                <p class="m3-body-medium" style="margin: 0; color: var(--md-sys-color-on-surface-variant);">
+                  Encountered an edge case, have an idea for a tool, or want to contribute? File a bug report or feature request directly on GitHub.
+                </p>
+              </div>
+              <div class="m3-flex-row m3-gap-sm" style="flex-wrap: wrap;">
+                <a href="https://github.com/Narayan6204/Pen-11/issues/new?template=feature_request.md" target="_blank" rel="noopener noreferrer" class="m3-btn m3-btn-filled" style="height: 44px; padding: 0 20px; gap: 8px;">
+                  <span class="material-symbols-rounded" style="font-size: 18px;">lightbulb</span>
+                  <span>Feature Request</span>
+                </a>
+                <a href="https://github.com/Narayan6204/Pen-11/issues/new?template=bug_report.md" target="_blank" rel="noopener noreferrer" class="m3-btn m3-btn-outlined" style="height: 44px; padding: 0 20px; gap: 8px;">
+                  <span class="material-symbols-rounded" style="font-size: 18px;">bug_report</span>
+                  <span>Report Bug</span>
+                </a>
+                <a href="https://github.com/Narayan6204/Pen-11" target="_blank" rel="noopener noreferrer" class="m3-btn m3-btn-tonal" style="height: 44px; padding: 0 20px; gap: 8px;">
+                  <span class="material-symbols-rounded" style="font-size: 18px;">star</span>
+                  <span>Star on GitHub</span>
+                </a>
+              </div>
+            </div>
+          </div>
+
+        </div>
+      </section>
+
       <!-- 7. Story & Motivation + UPI Donation Card -->
       <section id="story" class="m3-section" aria-labelledby="story-title">
         <div class="m3-container">
@@ -890,7 +1266,7 @@ python -m PyInstaller main.spec --noconfirm</code></pre>
                 <img src="assets/donate_qr.jpg" alt="UPI Donation QR Code - narayanadev@ptyes" style="border-radius: 8px; display: block; width: 100%; height: auto;">
               </div>
 
-              <span class="m3-label-small" style="font-family: var(--md-sys-typescale-font-mono); font-weight: 700; color: #7C5C35;">
+              <span class="m3-label-small" style="font-family: var(--md-sys-typescale-font-mono); font-weight: 700; color: var(--md-sys-color-primary);">
                 UPI ID: narayanadev@ptyes
               </span>
               <span class="m3-label-small" style="font-family: var(--md-sys-typescale-font-mono); margin-top: 4px;">
@@ -919,6 +1295,62 @@ python -m PyInstaller main.spec --noconfirm</code></pre>
 
           <div style="max-width: 820px; margin: 0 auto; display: flex; flex-direction: column; gap: 14px;">
             
+            <!-- FAQ 1: Graphics Tablets & Stylus -->
+            <details class="m3-card" style="padding: 20px 24px; border-radius: var(--md-sys-shape-corner-large); cursor: pointer; background: var(--md-sys-color-surface-container); border: 1px solid var(--md-sys-color-outline-variant); transition: background 200ms ease;">
+              <summary style="font-weight: 700; font-size: 1.05rem; color: var(--md-sys-color-on-surface); list-style: none; display: flex; justify-content: space-between; align-items: center;">
+                <span>Which graphics tablets, styluses, and digital pens are supported?</span>
+                <span class="material-symbols-rounded" style="font-size: 22px; color: var(--md-sys-color-primary); transition: transform 200ms ease;">expand_more</span>
+              </summary>
+              <p class="m3-body-medium" style="margin-top: 14px; line-height: 1.7; color: var(--md-sys-color-on-surface-variant);">
+                Pen 11 provides native, hardware-level support for any tablet or stylus compatible with Windows Ink / Wintab, including <strong>Wacom</strong> (Intuos, One, Cintiq), <strong>Huion</strong>, <strong>XP-Pen</strong>, <strong>Gaomon</strong>, and <strong>Microsoft Surface Pen</strong>. The app reads raw hardware pressure values via <code class="m3-kbd">tabletEvent()</code> for smooth, natural stroke tapering and automatically detects when you flip your stylus over (<code class="m3-kbd">PointerType.Eraser</code>) to erase without touching the toolbar.
+              </p>
+            </details>
+
+            <!-- FAQ 2: Multi-Monitor Support -->
+            <details class="m3-card" style="padding: 20px 24px; border-radius: var(--md-sys-shape-corner-large); cursor: pointer; background: var(--md-sys-color-surface-container); border: 1px solid var(--md-sys-color-outline-variant); transition: background 200ms ease;">
+              <summary style="font-weight: 700; font-size: 1.05rem; color: var(--md-sys-color-on-surface); list-style: none; display: flex; justify-content: space-between; align-items: center;">
+                <span>How does multi-monitor support work across different display resolutions?</span>
+                <span class="material-symbols-rounded" style="font-size: 22px; color: var(--md-sys-color-primary); transition: transform 200ms ease;">expand_more</span>
+              </summary>
+              <p class="m3-body-medium" style="margin-top: 14px; line-height: 1.7; color: var(--md-sys-color-on-surface-variant);">
+                Pen 11 is multi-monitor native: its drawing canvas spans your entire virtual desktop across all connected monitors, whether 1080p, 2K, 4K, or mixed DPI. Its smart positioning engine (<code class="m3-kbd">_smart_position()</code>) detects screen boundaries using <code class="m3-kbd">QApplication.screenAt()</code> and automatically flips flyout panels horizontally or vertically so palettes and menus never clip off-screen or slip under the Windows Taskbar.
+              </p>
+            </details>
+
+            <!-- FAQ 3: Portability & Uninstall -->
+            <details class="m3-card" style="padding: 20px 24px; border-radius: var(--md-sys-shape-corner-large); cursor: pointer; background: var(--md-sys-color-surface-container); border: 1px solid var(--md-sys-color-outline-variant); transition: background 200ms ease;">
+              <summary style="font-weight: 700; font-size: 1.05rem; color: var(--md-sys-color-on-surface); list-style: none; display: flex; justify-content: space-between; align-items: center;">
+                <span>How do I completely uninstall Pen 11 and remove configuration files?</span>
+                <span class="material-symbols-rounded" style="font-size: 22px; color: var(--md-sys-color-primary); transition: transform 200ms ease;">expand_more</span>
+              </summary>
+              <p class="m3-body-medium" style="margin-top: 14px; line-height: 1.7; color: var(--md-sys-color-on-surface-variant);">
+                Pen 11 is 100% portable: it does <strong>not</strong> write to the Windows Registry and does <strong>not</strong> install hidden background daemons. To uninstall, simply delete <code class="m3-kbd">Pen 11.exe</code>. If you also wish to clear your saved tool sizes and custom palette configurations, delete the settings folder at <code class="m3-kbd">%APPDATA%\Pen11\</code>.
+              </p>
+            </details>
+
+            <!-- FAQ 4: Fullscreen Apps, Presentations & Games -->
+            <details class="m3-card" style="padding: 20px 24px; border-radius: var(--md-sys-shape-corner-large); cursor: pointer; background: var(--md-sys-color-surface-container); border: 1px solid var(--md-sys-color-outline-variant); transition: background 200ms ease;">
+              <summary style="font-weight: 700; font-size: 1.05rem; color: var(--md-sys-color-on-surface); list-style: none; display: flex; justify-content: space-between; align-items: center;">
+                <span>Can I draw over fullscreen applications, games, and presentation slideshows?</span>
+                <span class="material-symbols-rounded" style="font-size: 22px; color: var(--md-sys-color-primary); transition: transform 200ms ease;">expand_more</span>
+              </summary>
+              <p class="m3-body-medium" style="margin-top: 14px; line-height: 1.7; color: var(--md-sys-color-on-surface-variant);">
+                <strong>Yes.</strong> Pen 11 creates a transparent, hardware-accelerated overlay with Windows non-activating flags (<code class="m3-kbd">WS_EX_NOACTIVATE</code> / <code class="m3-kbd">Qt.WindowDoesNotAcceptFocus</code>) so your active PowerPoint slide, PDF reader, browser, or screen share never loses focus while you annotate. For video games, running in <strong>Borderless Windowed</strong> mode allows Windows desktop overlays to render smoothly on top.
+              </p>
+            </details>
+
+            <!-- FAQ 5: Two-Layer Backing Cache & Performance -->
+            <details class="m3-card" style="padding: 20px 24px; border-radius: var(--md-sys-shape-corner-large); cursor: pointer; background: var(--md-sys-color-surface-container); border: 1px solid var(--md-sys-color-outline-variant); transition: background 200ms ease;">
+              <summary style="font-weight: 700; font-size: 1.05rem; color: var(--md-sys-color-on-surface); list-style: none; display: flex; justify-content: space-between; align-items: center;">
+                <span>Will Pen 11 lag during long drawing sessions or complex diagrams?</span>
+                <span class="material-symbols-rounded" style="font-size: 22px; color: var(--md-sys-color-primary); transition: transform 200ms ease;">expand_more</span>
+              </summary>
+              <p class="m3-body-medium" style="margin-top: 14px; line-height: 1.7; color: var(--md-sys-color-on-surface-variant);">
+                <strong>No.</strong> Unlike traditional tools that redraw every single vector point from scratch on every frame ($O(N)$), Pen 11 uses a <strong>Two-Layer Accelerated Backing Cache</strong>: completed strokes are permanently rasterized into a high-DPI Direct3D 11 off-screen buffer ($O(1)$). You can ink <strong>50,000+ strokes</strong> without dropping below 60 FPS or experiencing stroke accumulation lag.
+              </p>
+            </details>
+
+            <!-- FAQ 6: Free & Open Source -->
             <details class="m3-card" style="padding: 20px 24px; border-radius: var(--md-sys-shape-corner-large); cursor: pointer; background: var(--md-sys-color-surface-container); border: 1px solid var(--md-sys-color-outline-variant); transition: background 200ms ease;">
               <summary style="font-weight: 700; font-size: 1.05rem; color: var(--md-sys-color-on-surface); list-style: none; display: flex; justify-content: space-between; align-items: center;">
                 <span>Is Pen 11 completely free and open-source?</span>
@@ -929,16 +1361,7 @@ python -m PyInstaller main.spec --noconfirm</code></pre>
               </p>
             </details>
 
-            <details class="m3-card" style="padding: 20px 24px; border-radius: var(--md-sys-shape-corner-large); cursor: pointer; background: var(--md-sys-color-surface-container); border: 1px solid var(--md-sys-color-outline-variant); transition: background 200ms ease;">
-              <summary style="font-weight: 700; font-size: 1.05rem; color: var(--md-sys-color-on-surface); list-style: none; display: flex; justify-content: space-between; align-items: center;">
-                <span>What operating systems are supported by Pen 11?</span>
-                <span class="material-symbols-rounded" style="font-size: 22px; color: var(--md-sys-color-primary); transition: transform 200ms ease;">expand_more</span>
-              </summary>
-              <p class="m3-body-medium" style="margin-top: 14px; line-height: 1.7; color: var(--md-sys-color-on-surface-variant);">
-                Pen 11 is natively built and optimized for <strong>Windows 11 and Windows 10 (64-bit)</strong>. It takes direct advantage of Microsoft's Desktop Window Manager (DWM) and Direct3D 11 hardware pipeline for sub-millisecond drawing latency.
-              </p>
-            </details>
-
+            <!-- FAQ 7: Zero Admin Rights -->
             <details class="m3-card" style="padding: 20px 24px; border-radius: var(--md-sys-shape-corner-large); cursor: pointer; background: var(--md-sys-color-surface-container); border: 1px solid var(--md-sys-color-outline-variant); transition: background 200ms ease;">
               <summary style="font-weight: 700; font-size: 1.05rem; color: var(--md-sys-color-on-surface); list-style: none; display: flex; justify-content: space-between; align-items: center;">
                 <span>Does Pen 11 require an installer or administrator rights?</span>
@@ -949,23 +1372,14 @@ python -m PyInstaller main.spec --noconfirm</code></pre>
               </p>
             </details>
 
+            <!-- FAQ 8: Zero Idle CPU -->
             <details class="m3-card" style="padding: 20px 24px; border-radius: var(--md-sys-shape-corner-large); cursor: pointer; background: var(--md-sys-color-surface-container); border: 1px solid var(--md-sys-color-outline-variant); transition: background 200ms ease;">
               <summary style="font-weight: 700; font-size: 1.05rem; color: var(--md-sys-color-on-surface); list-style: none; display: flex; justify-content: space-between; align-items: center;">
                 <span>How does Pen 11 achieve zero idle CPU usage?</span>
                 <span class="material-symbols-rounded" style="font-size: 22px; color: var(--md-sys-color-primary); transition: transform 200ms ease;">expand_more</span>
               </summary>
               <p class="m3-body-medium" style="margin-top: 14px; line-height: 1.7; color: var(--md-sys-color-on-surface-variant);">
-                Unlike web/Electron-based tools that run heavy Chromium background loops, Pen 11 is built on native C++ and Qt bindings. When you are not drawing, its event loop sleeps at <strong>0.0% CPU</strong> and renders only modified dirty rects during active mouse/stylus strokes.
-              </p>
-            </details>
-
-            <details class="m3-card" style="padding: 20px 24px; border-radius: var(--md-sys-shape-corner-large); cursor: pointer; background: var(--md-sys-color-surface-container); border: 1px solid var(--md-sys-color-outline-variant); transition: background 200ms ease;">
-              <summary style="font-weight: 700; font-size: 1.05rem; color: var(--md-sys-color-on-surface); list-style: none; display: flex; justify-content: space-between; align-items: center;">
-                <span>Can I draw over Zoom, Microsoft Teams, PowerPoint, and games?</span>
-                <span class="material-symbols-rounded" style="font-size: 22px; color: var(--md-sys-color-primary); transition: transform 200ms ease;">expand_more</span>
-              </summary>
-              <p class="m3-body-medium" style="margin-top: 14px; line-height: 1.7; color: var(--md-sys-color-on-surface-variant);">
-                <strong>Yes.</strong> Pen 11 creates a transparent, click-through capable overlay layer with <code class="m3-kbd">WS_EX_NOACTIVATE</code> flags so your active PowerPoint slide, PDF reader, browser, or screen share never loses focus while you annotate.
+                Unlike web/Electron-based tools that run heavy Chromium background loops, Pen 11 is built on native Direct3D 11 and Qt bindings. When you are not drawing, its event loop sleeps at <strong>0.0% CPU</strong> and renders only modified dirty rects during active mouse/stylus strokes.
               </p>
             </details>
 
@@ -1118,6 +1532,6 @@ python -m PyInstaller main.spec --noconfirm</code></pre>
   </div>
 
   <!-- Application Entry Point ES Module -->
-  <script type="module" src="js/app.js?v=4.5.6"></script>
+  <script type="module" src="js/app.js?v=4.5.8"></script>
 </body>
 </html>

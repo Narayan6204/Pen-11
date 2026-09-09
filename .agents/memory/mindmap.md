@@ -1,5 +1,5 @@
 # Pen 11 — Project Mind Map
-> Last Updated: 2026-08-28
+> Last Updated: 2026-09-09
 
 ---
 
@@ -7,7 +7,7 @@
 
 Pen 11 is a **Windows-only transparent fullscreen overlay drawing application** built in Python/PyQt6.
 It lets users draw, annotate, and select vector objects directly on top of any running application.
-A companion Material Design 3 web landing page (hosted via Firebase) mirrors the core canvas features.
+A companion Material Design 3 web landing page & interactive canvas demo (hosted via Cloudflare Pages at https://pen-11.pages.dev/) mirrors the core canvas features.
 
 ---
 
