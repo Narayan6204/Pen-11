@@ -939,6 +939,60 @@ p {
     border-color: #392B18 !important;
     box-shadow: 0 1px 4px rgba(0, 0, 0, 0.3) !important;
   }
+
+  /* Preserve multi-column table layout with horizontal scrolling for comparison tables on mobile */
+  .m3-table-container.m3-table-scrollable {
+    overflow-x: auto !important;
+    -webkit-overflow-scrolling: touch;
+    background-color: #FAF6EC;
+    border: 1px solid #D6C4A6;
+    border-radius: var(--md-sys-shape-corner-medium);
+    padding: 0;
+  }
+
+  [data-theme="dark"] .m3-table-container.m3-table-scrollable,
+  [data-theme-resolved="dark"] .m3-table-container.m3-table-scrollable {
+    background-color: #261B0F !important;
+    border-color: #392B18 !important;
+  }
+
+  .m3-table-container.m3-table-scrollable .m3-table {
+    display: table !important;
+    min-width: 640px !important;
+    width: 100% !important;
+  }
+
+  .m3-table-container.m3-table-scrollable thead {
+    display: table-header-group !important;
+  }
+
+  .m3-table-container.m3-table-scrollable tbody {
+    display: table-row-group !important;
+  }
+
+  .m3-table-container.m3-table-scrollable tbody tr {
+    display: table-row !important;
+    background-color: transparent !important;
+    border: none !important;
+    box-shadow: none !important;
+    padding: 0 !important;
+    margin: 0 !important;
+  }
+
+  .m3-table-container.m3-table-scrollable th,
+  .m3-table-container.m3-table-scrollable td {
+    display: table-cell !important;
+    padding: 12px 14px !important;
+    border-bottom: 1px solid #DDD0B5 !important;
+    white-space: normal;
+  }
+
+  [data-theme="dark"] .m3-table-container.m3-table-scrollable th,
+  [data-theme="dark"] .m3-table-container.m3-table-scrollable td,
+  [data-theme-resolved="dark"] .m3-table-container.m3-table-scrollable th,
+  [data-theme-resolved="dark"] .m3-table-container.m3-table-scrollable td {
+    border-bottom-color: #392B18 !important;
+  }
 }
 
 .shortcut-action,
