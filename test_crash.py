@@ -24,14 +24,16 @@ window.mode = main.ToolMode.PEN
 path = QPainterPath()
 path.addRect(10, 10, 100, 100)
 window.paths.append({'path': path, 'pen': QPen(), 'mode': main.ToolMode.PEN})
-window.selected_path_index = 0
+window.selected_path_indices = [0]
+window._recalculate_master_obb()
 window.mode = main.ToolMode.SELECT
 
 # Select mode, simulate click on rotate handle
 # First calculate rot_handle
-rot_center, del_center = window._get_selection_handles(window.paths[0].get('obb', main.QPolygonF(path.boundingRect())))
+rot_center, del_center, scale_center = window._get_selection_handles(window.paths[0].get('obb', main.QPolygonF(path.boundingRect())))
 print("rot_center:", rot_center)
 print("del_center:", del_center)
+print("scale_center:", scale_center)
 
 event = QMouseEvent(QMouseEvent.Type.MouseButtonPress, rot_center, Qt.MouseButton.LeftButton, Qt.MouseButton.LeftButton, Qt.KeyboardModifier.NoModifier)
 try:

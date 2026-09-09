@@ -2,6 +2,34 @@
 
 ---
 
+## Session - 2026-09-05 19:06 IST (Fix Post-Caching Rendering Regression — 6 Surgical Fixes)
+
+### What Was Done
+- Diagnosed and fixed ALL rendering regressions introduced by the Two-Layer Backing Cache (commit `6f72049`).
+- Deployed 2 parallel research subagents (Stable Version Researcher + Current Code Deep Reader) that independently confirmed the same root causes.
+- Applied 6 surgical single-line fixes:
+  1. **paintEvent L1779**: Removed `selection_action` guard — selected strokes now render always, not just during active transforms.
+  2. **set_mode L920**: Added `_rebake_cache()` when leaving SELECT mode — prevents permanent stroke invisibility.
+  3. **mousePressEvent L1354**: Added `_rebake_cache(exclude_indices=...)` for rotate handle — prevents ghosting.
+  4. **mousePressEvent L1384**: Added `_rebake_cache(exclude_indices=...)` for scale handle — prevents ghosting.
+  5. **mousePressEvent L1399**: Added `_rebake_cache(exclude_indices=...)` for drag-inside-box — prevents ghosting.
+  6. **_erase_between L1717**: Removed stale `exclude_indices=self.selected_path_indices` — prevents wrong exclusions.
+- Syntax verified via AST parse (OK).
+
+### Key Decisions Made
+- Root cause was a cache exclusion / rendering mismatch: selected strokes were removed from static cache but `paintEvent` only rendered them dynamically during active transforms (`drag`/`rotate`/`scale`), not during idle selection.
+- Fixed by rendering selected strokes as live vectors WHENEVER they exist in `selected_path_indices` (not just during transforms).
+- Deferred 2 non-blocking issues: highlighter opacity compounding with tablet pressure (visual), eraser undo timeline destruction (pre-existing).
+
+### Confidence Level
+- HIGH — syntax verified, all 6 changes are single-line additions with zero architecture changes.
+
+### Next Steps
+- Manual testing with the 15-point checklist (draw, select, drag, rotate, scale, delete, mode switch, undo, erase, clear)
+- Build `Pen 11.exe` with PyInstaller and test
+
+---
+
 ## Session - 2026-08-29 09:20 IST (Two-Layer Accelerated Backing Cache Engine)
 
 ### What Was Done

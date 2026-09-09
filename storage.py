@@ -33,9 +33,12 @@ class SettingsManager:
                 with open(self._path, 'r', encoding='utf-8') as f:
                     saved = json.load(f)
                 # Merge: use saved values but fill in any missing keys with defaults
+                # Guard against corrupted files that have a non-dict JSON root
+                if not isinstance(saved, dict):
+                    raise ValueError("Settings file root is not a dict")
                 for key, default_val in DEFAULTS.items():
                     self._data[key] = saved.get(key, default_val)
-        except (json.JSONDecodeError, OSError, PermissionError):
+        except (json.JSONDecodeError, OSError, PermissionError, ValueError):
             # Corrupted or unreadable file — start fresh with defaults
             self._data = dict(DEFAULTS)
 
@@ -47,6 +50,8 @@ class SettingsManager:
             tmp_path = self._path + '.tmp'
             with open(tmp_path, 'w', encoding='utf-8') as f:
                 json.dump(self._data, f, indent=2)
+                f.flush()
+                os.fsync(f.fileno())  # ensure data hits disk before rename
             os.replace(tmp_path, self._path)  # atomic on Windows (POSIX-like)
         except (OSError, PermissionError):
             pass  # Silently fail — don't crash the app over a settings write

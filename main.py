@@ -37,13 +37,16 @@ from PyQt6.QtWidgets import (
     QPushButton, QLabel, QGridLayout, QSystemTrayIcon, QMenu, QFrame,
     QGraphicsDropShadowEffect, QMessageBox, QGraphicsOpacityEffect
 )
-from PyQt6.QtCore import Qt, QPoint, QRect, QRectF, pyqtSignal, QObject, QTimer, QPointF, QPropertyAnimation, QEasingCurve
+from PyQt6.QtCore import Qt, QPoint, QRect, QRectF, pyqtSignal, QObject, QTimer, QPointF, QPropertyAnimation, QEasingCurve, QSize, QEvent
 from PyQt6.QtGui import QPainter, QPen, QColor, QPainterPath, QPainterPathStroker, QPixmap, QIcon, QCursor, QFont, QTransform, QPolygonF
 
 # ── Windows API constants for click-through ──
 WS_EX_TRANSPARENT = 0x00000020
 WS_EX_LAYERED     = 0x00080000
 GWL_EXSTYLE       = -20
+_user32 = ctypes.windll.user32
+_GetWindowLong = _user32.GetWindowLongPtrW if ctypes.sizeof(ctypes.c_void_p) == 8 else _user32.GetWindowLongW
+_SetWindowLong = _user32.SetWindowLongPtrW if ctypes.sizeof(ctypes.c_void_p) == 8 else _user32.SetWindowLongW
 
 # ── Enumerations ──
 class ToolMode:
@@ -104,6 +107,7 @@ class ShortcutSignals(QObject):
     toggle_shape_toolbox = pyqtSignal()
     switch_select       = pyqtSignal()
     toolbar_moved       = pyqtSignal(QPoint)
+    dismiss_transient_flyouts = pyqtSignal()
 
 
 # ── Reusable Widgets ──
@@ -163,15 +167,34 @@ class FadeTooltip(QWidget):
 
     def cancel(self):
         self._show_delay.stop()
+        self._pending_text = None
         self._fade_out()
 
+    def hide_immediately(self):
+        """Immediately stop all timers, animations, and hide the tooltip window without delay."""
+        self._show_delay.stop()
+        self._pending_text = None
+        self._pending_pos = None
+        self._anim.stop()
+        self._anim_state = 0
+        self._opacity_effect.setOpacity(0.0)
+        super().hide()
+
     def _do_show(self):
-        if not self._pending_text:
+        if not self._pending_text or not self._pending_pos:
             return
         self._label.setText(self._pending_text)
         self.adjustSize()
         x = self._pending_pos.x() + 16
         y = self._pending_pos.y() - self.height() // 2
+
+        # Clamp inside the current screen bounds
+        screen = QApplication.screenAt(self._pending_pos) or QApplication.primaryScreen()
+        if screen:
+            avail = screen.availableGeometry()
+            x = max(avail.left() + 4, min(avail.right() - self.width() - 4, x))
+            y = max(avail.top() + 4, min(avail.bottom() - self.height() - 4, y))
+
         self.move(x, y)
         self._anim_state = 1
         self._anim.stop()
@@ -208,27 +231,42 @@ class FadeTooltip(QWidget):
 
 
 def _install_fade_tooltip(widget, text):
-    """Attach FadeTooltip enter/leave to a widget, disabling the blinking system tooltip.
+    """Attach FadeTooltip enter/leave/click/hide to a widget, disabling the blinking system tooltip.
     Chains the original Qt event handlers so native hover styling is preserved.
     """
     widget.setToolTip("")  # suppress the flickering native tooltip
 
     orig_enter = widget.enterEvent
     orig_leave = widget.leaveEvent
+    orig_press = widget.mousePressEvent
+    orig_hide = widget.hideEvent
 
     def _enter(event, _t=text):
         FadeTooltip.instance().schedule_show(_t, QCursor.pos())
         orig_enter(event)  # preserve Qt hover highlight
 
     def _leave(event, _t=text):
-        # Only cancel if this button's tooltip is the one pending (race-condition fix)
+        # Only cancel if THIS button's tooltip is still pending/visible (race-condition fix)
         tip = FadeTooltip.instance()
-        if tip._pending_text == _t or tip._anim_state in (1, 2):
+        if tip._pending_text == _t:
             tip.cancel()
         orig_leave(event)  # preserve Qt hover highlight
 
+    def _press(event):
+        # Dismiss tooltip instantly when user clicks/presses the button
+        FadeTooltip.instance().hide_immediately()
+        orig_press(event)
+
+    def _hide(event, _t=text):
+        tip = FadeTooltip.instance()
+        if tip._pending_text == _t:
+            tip.hide_immediately()
+        orig_hide(event)
+
     widget.enterEvent = _enter
     widget.leaveEvent = _leave
+    widget.mousePressEvent = _press
+    widget.hideEvent = _hide
 
 
 class HoldButton(QPushButton):
@@ -256,6 +294,10 @@ class HoldButton(QPushButton):
     def mouseReleaseEvent(self, event):
         if event.button() == Qt.MouseButton.LeftButton:
             self.hold_timer.stop()
+            if self._held:
+                self._held = False
+                event.accept()  # Suppress clicked signal after hold action triggered
+                return
         super().mouseReleaseEvent(event)
 
     def _on_hold(self):
@@ -302,8 +344,9 @@ class FloatingPanel(QWidget):
     def __init__(self, signals=None, parent=None):
         super().__init__(parent)
         self.signals = signals
-        self._drag_pos = None
         self.has_been_dragged = False
+        self._press_mouse_global = None
+        self._press_window_pos = None
         self._fade_state = 0  # 0=hidden, 1=fading_in, 2=visible, 3=fading_out
 
         self.setWindowFlags(Qt.WindowType.Tool | Qt.WindowType.FramelessWindowHint | Qt.WindowType.WindowStaysOnTopHint)
@@ -334,6 +377,7 @@ class FloatingPanel(QWidget):
         self._opacity_anim.start()
 
     def fade_out(self, duration=120):
+        FadeTooltip.instance().hide_immediately()
         if self._fade_state in (0, 3):
             return
         self._fade_state = 3
@@ -344,9 +388,10 @@ class FloatingPanel(QWidget):
         self._opacity_anim.start()
 
     def instant_hide(self):
+        FadeTooltip.instance().hide_immediately()
         self._opacity_anim.stop()
         self._fade_state = 0
-        self.setWindowOpacity(1.0)
+        self.setWindowOpacity(0.0)  # prevent single-frame flash if hiding mid-fade
         super().hide()
 
     def _on_fade_finished(self):
@@ -354,81 +399,106 @@ class FloatingPanel(QWidget):
             self._fade_state = 2
         elif self._fade_state == 3:
             self._fade_state = 0
-            self.setWindowOpacity(1.0)
+            self.setWindowOpacity(0.0)
             super().hide()
 
     @staticmethod
-    def _smart_position(popup_widget, anchor_widget, gap=10):
-        """Calculate the best screen position for popup_widget anchored to anchor_widget.
+    def _smart_position(popup_widget, anchor_widget, prefer_left=True, gap=5):
+        """Calculates exact auto-flipped and taskbar-safe coordinates for popups."""
+        popup_widget.adjustSize()
+        w = max(popup_widget.width(), popup_widget.sizeHint().width())
+        h = max(popup_widget.height(), popup_widget.sizeHint().height())
         
-        Rules:
-        1. Use the outer ToolbarWindow edge for horizontal placement so popup never overlaps the toolbar.
-        2. Prefer LEFT of toolbar. Flip to RIGHT if no room.
-        3. Vertically center popup on the anchor button, clamped to available screen area.
-        4. Use sizeHint() for accurate dimensions even when the widget hasn't been shown yet.
-        5. Works correctly on multi-monitor setups.
-        
-        Returns: QPoint with the ideal top-left position for the popup.
-        """
-        # Use sizeHint() for accurate size — adjustSize() on hidden widgets is unreliable
-        hint = popup_widget.sizeHint()
-        popup_w = max(hint.width(), popup_widget.width(), 160)
-        popup_h = max(hint.height(), popup_widget.height(), 50)
-
-        # Map anchor button's top-left to global screen coordinates
         btn_global = anchor_widget.mapToGlobal(QPoint(0, 0))
         btn_rect = QRect(btn_global, anchor_widget.size())
-
-        # Use the outer toolbar window edge so popup is flush against the toolbar,
-        # not just the button (avoids overlapping the toolbar body)
-        anchor_win = anchor_widget.window()
-        win_rect = anchor_win.geometry() if anchor_win else btn_rect
-
-        # Find the active screen that contains the anchor button center
-        screen = QApplication.screenAt(btn_rect.center()) or QApplication.primaryScreen()
-        avail = screen.availableGeometry()  # excludes taskbar automatically
-
-        # --- Horizontal placement: measure from toolbar window edge ---
-        space_left = win_rect.left() - avail.left()
-        space_right = avail.right() - win_rect.right()
-
-        if space_left >= popup_w + gap:
-            # Default: flush against the LEFT side of the toolbar
-            target_x = win_rect.left() - popup_w - gap
-        elif space_right >= popup_w + gap:
-            # Flip: flush against the RIGHT side of the toolbar
-            target_x = win_rect.right() + gap
+        screen = (QApplication.screenAt(btn_rect.center()) or 
+                  QApplication.screenAt(QCursor.pos()) or 
+                  QApplication.primaryScreen())
+        avail = screen.availableGeometry()
+        margin = 4
+        
+        left_x = btn_rect.left() - w - gap
+        right_x = btn_rect.right() + gap
+        
+        if prefer_left:
+            if left_x >= avail.left() + margin:
+                target_x = left_x
+            elif right_x + w <= avail.right() - margin:
+                target_x = right_x
+            else:
+                target_x = max(avail.left() + margin, min(avail.right() - w - margin, left_x))
         else:
-            # Very tight screen — best effort placement
-            target_x = max(avail.left() + gap,
-                           min(avail.right() - popup_w - gap, win_rect.left() - popup_w - gap))
-
-        # --- Vertical placement: center on anchor button, clamp to screen ---
-        ideal_y = btn_rect.center().y() - popup_h // 2
-        target_y = max(avail.top() + gap,
-                       min(avail.bottom() - popup_h - gap, ideal_y))
-
+            if right_x + w <= avail.right() - margin:
+                target_x = right_x
+            elif left_x >= avail.left() + margin:
+                target_x = left_x
+            else:
+                target_x = max(avail.left() + margin, min(avail.right() - w - margin, right_x))
+                
+        ideal_y = btn_rect.center().y() - h // 2
+        min_y = avail.top() + margin
+        max_y = avail.bottom() - h - margin
+        target_y = min_y if max_y < min_y else max(min_y, min(ideal_y, max_y))
+        
         return QPoint(target_x, target_y)
 
     def mousePressEvent(self, event):
         if event.button() == Qt.MouseButton.LeftButton:
-            self._drag_pos = event.globalPosition().toPoint()
+            self._press_mouse_global = event.globalPosition().toPoint()
+            self._press_window_pos = self.pos()
+            if hasattr(self, 'signals') and self.signals and hasattr(self.signals, 'dismiss_transient_flyouts'):
+                self.signals.dismiss_transient_flyouts.emit()
+            if hasattr(FadeTooltip, 'instance') and FadeTooltip.instance():
+                FadeTooltip.instance().hide_immediately()
             event.accept()
         else:
             super().mousePressEvent(event)
 
     def mouseMoveEvent(self, event):
-        if self._drag_pos is not None:
-            delta = event.globalPosition().toPoint() - self._drag_pos
-            self.move(self.pos() + delta)
-            self._drag_pos = event.globalPosition().toPoint()
+        if hasattr(self, '_press_mouse_global') and self._press_mouse_global is not None and hasattr(self, '_press_window_pos') and self._press_window_pos is not None:
+            mouse_vector = event.globalPosition().toPoint() - self._press_mouse_global
+            unconstrained_pos = self._press_window_pos + mouse_vector
+            
+            p_w = max(self.width(), self.sizeHint().width())
+            p_h = max(self.height(), self.sizeHint().height())
+            
+            screen = (QApplication.screenAt(QRect(unconstrained_pos, QSize(p_w, p_h)).center()) or 
+                      QApplication.screenAt(event.globalPosition().toPoint()) or 
+                      QApplication.primaryScreen())
+            avail = screen.availableGeometry()
+            margin = 4
+            
+            clamped_x = max(avail.left() + margin, min(avail.right() - p_w - margin, unconstrained_pos.x()))
+            clamped_y = max(avail.top() + margin, min(avail.bottom() - p_h - margin, unconstrained_pos.y()))
+            
+            self.move(QPoint(clamped_x, clamped_y))
             self.has_been_dragged = True
             event.accept()
         else:
             super().mouseMoveEvent(event)
 
     def mouseReleaseEvent(self, event):
-        self._drag_pos = None
+        self._press_mouse_global = None
+        self._press_window_pos = None
+        if hasattr(self, 'toolbar') and self.toolbar and self.__class__.__name__ == 'FloatingColorPalette':
+            docked_pos = FloatingPanel._smart_position(self, self.toolbar.btn_palette, prefer_left=True, gap=5)
+            dist = math.hypot(self.x() - docked_pos.x(), self.y() - docked_pos.y())
+            if dist <= 35:
+                self.is_detached = False
+                self.move(docked_pos)
+            else:
+                self.is_detached = True
+                if self.geometry().intersects(self.toolbar.geometry()):
+                    screen = QApplication.screenAt(self.geometry().center()) or QApplication.primaryScreen()
+                    avail = screen.availableGeometry()
+                    margin = 4
+                    t_geom = self.toolbar.geometry()
+                    left_x = t_geom.left() - self.width() - 5
+                    right_x = t_geom.right() + 5
+                    if left_x >= avail.left() + margin:
+                        self.move(left_x, self.y())
+                    elif right_x + self.width() <= avail.right() - margin:
+                        self.move(right_x, self.y())
         super().mouseReleaseEvent(event)
 
     def paintEvent(self, event):
@@ -478,14 +548,23 @@ class CustomHoverMenu(FloatingPanel):
         self.layout.addWidget(btn, idx // 2, idx % 2)
         return btn
 
+    def mousePressEvent(self, event):
+        event.accept()
+
+    def mouseMoveEvent(self, event):
+        event.accept()
+
+    def mouseReleaseEvent(self, event):
+        event.accept()
+
     def show_menu(self, anchor_widget):
-        if not self.has_been_dragged:
-            pos = FloatingPanel._smart_position(self, anchor_widget)
-            self.move(pos)
+        pos = FloatingPanel._smart_position(self, anchor_widget, prefer_left=True, gap=5)
+        self.move(pos)
         self.raise_()
         self.fade_in(150)
 
     def hide_menu(self):
+        FadeTooltip.instance().hide_immediately()
         self.fade_out(120)
 
 
@@ -569,6 +648,10 @@ class ClickMenuButton(QPushButton):
                     self.window().shape_menu.hide_menu()
                 if hasattr(self.window(), 'cursor_menu') and self.window().cursor_menu != self.menu_widget and self.window().cursor_menu.isVisible():
                     self.window().cursor_menu.hide_menu()
+                if hasattr(self.window(), 'main_coordinator') and self.window().main_coordinator:
+                    palette = getattr(self.window().main_coordinator, 'color_palette', None)
+                    if palette and palette.isVisible() and not getattr(palette, 'is_detached', False):
+                        palette.fade_out()
                 self.menu_widget.show_menu(self)
                 self.menu_widget.raise_()
 
@@ -579,30 +662,93 @@ class DragHandle(QWidget):
         super().__init__(parent)
         self.setFixedSize(40, 12)
         self.setCursor(Qt.CursorShape.OpenHandCursor)
-        self._drag_pos = None
+        self._press_mouse_global = None
+        self._press_parent_pos = None
 
     def mousePressEvent(self, event):
         if event.button() == Qt.MouseButton.LeftButton:
             self.setCursor(Qt.CursorShape.ClosedHandCursor)
-            self._drag_pos = event.globalPosition().toPoint()
+            self._press_mouse_global = event.globalPosition().toPoint()
+            self._press_parent_pos = self.parent().pos()
+            if hasattr(self.parent(), 'signals') and self.parent().signals:
+                if hasattr(self.parent().signals, 'dismiss_transient_flyouts'):
+                    self.parent().signals.dismiss_transient_flyouts.emit()
+            if hasattr(FadeTooltip, 'instance') and FadeTooltip.instance():
+                FadeTooltip.instance().cancel()
             event.accept()
 
     def mouseMoveEvent(self, event):
-        if self._drag_pos is not None:
-            delta = event.globalPosition().toPoint() - self._drag_pos
-            self.parent().move(self.parent().pos() + delta)
-            self._drag_pos = event.globalPosition().toPoint()
-            self.parent().has_been_dragged = True
+        if self._press_mouse_global is not None and self._press_parent_pos is not None:
+            parent = self.parent()
+            mouse_vector = event.globalPosition().toPoint() - self._press_mouse_global
+            unconstrained_parent_pos = self._press_parent_pos + mouse_vector
+            margin = 4
             
-            # ONLY the main toolbar emits toolbar_moved to move attached sub-panels
-            if self.parent().__class__.__name__ == 'ToolbarWindow':
-                if hasattr(self.parent(), 'signals') and hasattr(self.parent().signals, 'toolbar_moved'):
-                    self.parent().signals.toolbar_moved.emit(delta)
+            if parent.__class__.__name__ == 'ToolbarWindow':
+                # Pure Pill-Handle Bounding for main toolbar
+                h_x, h_y = self.x(), self.y()
+                h_w, h_h = self.width(), self.height()
+                unconstrained_handle_rect = QRect(unconstrained_parent_pos.x() + h_x,
+                                                  unconstrained_parent_pos.y() + h_y,
+                                                  h_w, h_h)
+                screen = (QApplication.screenAt(unconstrained_handle_rect.center()) or 
+                          QApplication.screenAt(event.globalPosition().toPoint()) or 
+                          QApplication.primaryScreen())
+                avail = screen.availableGeometry()
+                clamped_handle_x = max(avail.left() + margin, 
+                                       min(avail.right() - h_w - margin, unconstrained_handle_rect.left()))
+                clamped_handle_y = max(avail.top() + margin, 
+                                       min(avail.bottom() - h_h - margin, unconstrained_handle_rect.top()))
+                clamped_parent_pos = QPoint(clamped_handle_x - h_x, clamped_handle_y - h_y)
+            else:
+                # Full-Body Bounding for sub-palettes (e.g. Color Palette: 100% of swatches stay above taskbar)
+                p_w = max(parent.width(), parent.sizeHint().width())
+                p_h = max(parent.height(), parent.sizeHint().height())
+                screen = (QApplication.screenAt(QRect(unconstrained_parent_pos, QSize(p_w, p_h)).center()) or 
+                          QApplication.screenAt(event.globalPosition().toPoint()) or 
+                          QApplication.primaryScreen())
+                avail = screen.availableGeometry()
+                clamped_x = max(avail.left() + margin, min(avail.right() - p_w - margin, unconstrained_parent_pos.x()))
+                clamped_y = max(avail.top() + margin, min(avail.bottom() - p_h - margin, unconstrained_parent_pos.y()))
+                clamped_parent_pos = QPoint(clamped_x, clamped_y)
+            
+            old_pos = parent.pos()
+            parent.move(clamped_parent_pos)
+            parent.has_been_dragged = True
+            
+            # Compute actual effective delta and emit to attached sub-panels
+            actual_delta = clamped_parent_pos - old_pos
+            if not actual_delta.isNull() and parent.__class__.__name__ == 'ToolbarWindow':
+                if hasattr(parent, 'signals') and hasattr(parent.signals, 'toolbar_moved'):
+                    parent.signals.toolbar_moved.emit(actual_delta)
             event.accept()
 
     def mouseReleaseEvent(self, event):
         self.setCursor(Qt.CursorShape.OpenHandCursor)
-        self._drag_pos = None
+        self._press_mouse_global = None
+        self._press_parent_pos = None
+        parent = self.parent()
+        if parent and parent.__class__.__name__ == 'FloatingColorPalette':
+            if hasattr(parent, 'toolbar') and parent.toolbar:
+                docked_pos = FloatingPanel._smart_position(parent, parent.toolbar.btn_palette, prefer_left=True, gap=5)
+                dist = math.hypot(parent.x() - docked_pos.x(), parent.y() - docked_pos.y())
+                if dist <= 35:
+                    parent.is_detached = False
+                    parent.move(docked_pos)
+                else:
+                    parent.is_detached = True
+                    # Drop snap-aside if overlapping toolbar
+                    if parent.geometry().intersects(parent.toolbar.geometry()):
+                        screen = QApplication.screenAt(parent.geometry().center()) or QApplication.primaryScreen()
+                        avail = screen.availableGeometry()
+                        margin = 4
+                        t_geom = parent.toolbar.geometry()
+                        left_x = t_geom.left() - parent.width() - 5
+                        right_x = t_geom.right() + 5
+                        if left_x >= avail.left() + margin:
+                            parent.move(left_x, parent.y())
+                        elif right_x + parent.width() <= avail.right() - margin:
+                            parent.move(right_x, parent.y())
         event.accept()
 
     def paintEvent(self, event):
@@ -622,19 +768,6 @@ class OverlayWindow(QMainWindow):
     def __init__(self, signals):
         super().__init__()
         self.signals = signals
-
-        self.setWindowFlags(
-            Qt.WindowType.FramelessWindowHint |
-            Qt.WindowType.WindowStaysOnTopHint |
-            Qt.WindowType.Tool
-        )
-        self.setAttribute(Qt.WidgetAttribute.WA_TranslucentBackground)
-
-        # Span all monitors
-        virtual_rect = QRect()
-        for screen in QApplication.screens():
-            virtual_rect = virtual_rect.united(screen.geometry())
-        self.setGeometry(virtual_rect)
 
         # Tool state
         self.mode = ToolMode.PEN
@@ -660,10 +793,6 @@ class OverlayWindow(QMainWindow):
         self.drawing = False
         self.undo_stack_size = 0
 
-        # Two-layer canvas cache (O(1) rendering)
-        self.canvas_cache = None
-        self._init_canvas_cache()
-
         # Pen tablet support
         self._tablet_pressure = 1.0     # Current pressure (1.0 = full/mouse)
         self._tablet_active = False     # True while stylus is in contact
@@ -680,12 +809,12 @@ class OverlayWindow(QMainWindow):
         self.selection_start_master_obb = None
         self.is_lassoing = False
         self.lasso_path = None
-        self.selection_action = None # None, 'drag', 'rotate'
+        self.selection_action = None # None, 'drag', 'rotate', 'scale'
         self.selection_start_pos = None
         self.selection_start_path = None
         self.selection_start_center = None
         self.selection_rotation_start_angle = 0
-        self.selection_start_states = []  # FIX 7: always initialized
+        self.selection_start_states = []
 
         # Connect signals
         self.signals.switch_pen.connect(lambda: self.set_mode(ToolMode.PEN))
@@ -704,7 +833,26 @@ class OverlayWindow(QMainWindow):
         self.signals.change_eraser_size.connect(self.set_eraser_size)
         self.signals.increment_size.connect(lambda: self._step_size(1))
         self.signals.decrement_size.connect(lambda: self._step_size(-1))
-        # Exit app signal is now handled by MainAppCoordinator for clean shutdown
+
+        self.setWindowFlags(
+            Qt.WindowType.FramelessWindowHint |
+            Qt.WindowType.WindowStaysOnTopHint |
+            Qt.WindowType.Tool
+        )
+        self.setAttribute(Qt.WidgetAttribute.WA_TranslucentBackground)
+        self.setFocusPolicy(Qt.FocusPolicy.StrongFocus)
+
+        # Span all monitors
+        virtual_rect = QRect()
+        for screen in QApplication.screens():
+            virtual_rect = virtual_rect.united(screen.geometry())
+        if virtual_rect.isEmpty():
+            virtual_rect = QRect(0, 0, 1920, 1080)
+        self.setGeometry(virtual_rect)
+
+        # Two-layer canvas cache (O(1) rendering)
+        self.canvas_cache = None
+        self._init_canvas_cache()
 
         self.set_mode(ToolMode.PEN)
 
@@ -722,15 +870,18 @@ class OverlayWindow(QMainWindow):
 
     def set_pen_size(self, size):
         self.pen_size = size
-        self.set_mode(ToolMode.PEN)
+        if self.mode == ToolMode.PEN:
+            self._update_cursor()
 
     def set_highlighter_size(self, size):
         self.highlighter_size = size
-        self.set_mode(ToolMode.HIGHLIGHTER)
+        if self.mode == ToolMode.HIGHLIGHTER:
+            self._update_cursor()
 
     def set_eraser_size(self, size):
         self.eraser_size = size
-        self.set_mode(ToolMode.ERASER)
+        if self.mode == ToolMode.ERASER:
+            self._update_cursor()
 
     # ── Cursor rendering ──
 
@@ -794,6 +945,11 @@ class OverlayWindow(QMainWindow):
         # Safety: stop shape detection timer so _detect_shape can't fire on stale path
         self.shape_timer.stop()
         self.drawing = False
+        self.raw_points = []
+        self.raw_pressures = []
+        self.current_path = None
+        self.selection_action = None
+        self.selection_start_states.clear()
 
         # Rule: Only PEN can activate a hidden canvas (removed for highlighter and eraser)
         if not self.ink_visible and new_mode == ToolMode.PEN:
@@ -806,8 +962,10 @@ class OverlayWindow(QMainWindow):
         if self.mode == ToolMode.SELECT and new_mode != ToolMode.SELECT:
             self.selected_path_indices.clear()
             self._recalculate_master_obb()
+            self.selection_start_master_obb = None
             self.is_lassoing = False
             self.lasso_path = None
+            self._rebake_cache()
             self.update()
         self.mode = new_mode
         self.set_click_through(new_mode == ToolMode.CURSOR or not self.ink_visible)
@@ -822,8 +980,11 @@ class OverlayWindow(QMainWindow):
             # Change color of selected object
             for idx in self.selected_path_indices:
                 if idx < len(self.paths):
-                    self.paths[idx]['pen'].setColor(QColor(hex_color))
-            self._rebake_cache()
+                    c = QColor(hex_color)
+                    if self.paths[idx].get('mode') == ToolMode.HIGHLIGHTER:
+                        c.setAlpha(60)
+                    self.paths[idx]['pen'].setColor(c)
+            self._rebake_cache(exclude_indices=self.selected_path_indices)
             self.update()
             return
 
@@ -844,10 +1005,22 @@ class OverlayWindow(QMainWindow):
         if not gc.isenabled():
             gc.enable()
         self.drawing = False
+        self.current_path = None   # discard any partially drawn stroke
+        self.raw_points = []
+        self.raw_pressures = []
         self.shape_timer.stop()
 
         self.ink_visible = not self.ink_visible
-        if self.ink_visible and self.mode == ToolMode.CURSOR:
+        if not self.ink_visible:
+            if self.mode == ToolMode.SELECT and self.selected_path_indices:
+                self.selected_path_indices.clear()
+                self._recalculate_master_obb()
+                self._rebake_cache()
+            self.is_lassoing = False
+            self.lasso_path = None
+            self.selection_action = None
+            self.selection_start_states.clear()
+        elif self.mode == ToolMode.CURSOR:
             self.set_mode(ToolMode.PEN)
         self.set_click_through(not self.ink_visible or self.mode == ToolMode.CURSOR)
         self.signals.visibility_changed.emit(self.ink_visible)
@@ -858,11 +1031,9 @@ class OverlayWindow(QMainWindow):
             return
         self.is_click_through = enabled
         hwnd = int(self.winId())
-        ex_style = ctypes.windll.user32.GetWindowLongW(hwnd, GWL_EXSTYLE)
-        if enabled:
-            ctypes.windll.user32.SetWindowLongW(hwnd, GWL_EXSTYLE, ex_style | WS_EX_TRANSPARENT | WS_EX_LAYERED)
-        else:
-            ctypes.windll.user32.SetWindowLongW(hwnd, GWL_EXSTYLE, ex_style & ~WS_EX_TRANSPARENT)
+        ex_style = _GetWindowLong(hwnd, GWL_EXSTYLE)
+        flags = (ex_style | WS_EX_TRANSPARENT | WS_EX_LAYERED) if enabled else (ex_style & ~WS_EX_TRANSPARENT)
+        _SetWindowLong(hwnd, GWL_EXSTYLE, flags)
 
     # ── Pen helpers ──
 
@@ -908,7 +1079,8 @@ class OverlayWindow(QMainWindow):
             path.lineTo(end_pt)
             # draw arrow head
             angle = math.atan2(end_pt.y() - start_pt.y(), end_pt.x() - start_pt.x())
-            head_len = max(15, self.pen_size * 3.5)
+            arrow_len = math.hypot(end_pt.x() - start_pt.x(), end_pt.y() - start_pt.y())
+            head_len = min(arrow_len * 0.4, max(12.0, self.pen_size * 3.5)) if arrow_len > 0 else 0
             
             angle_left = angle - math.pi/7
             wing_left = QPointF(end_pt.x() - head_len * math.cos(angle_left), end_pt.y() - head_len * math.sin(angle_left))
@@ -953,7 +1125,8 @@ class OverlayWindow(QMainWindow):
 
         # Variable-width pressure rendering (pen tablet)
         has_pressure_data = (points is not None and pressures is not None
-                             and len(points) > 1 and len(pressures) > 1)
+                             and len(points) > 1 and len(pressures) > 1
+                             and mode == ToolMode.PEN)
         # Only use variable rendering if pressure actually varies (tablet input)
         if has_pressure_data:
             min_p = min(pressures)
@@ -993,23 +1166,52 @@ class OverlayWindow(QMainWindow):
             self.master_obb = None
             return
             
+        MIN_DIM = 28.0
+        # Single selection: preserve true rotated OBB if available
+        if len(self.selected_path_indices) == 1:
+            idx = self.selected_path_indices[0]
+            if idx < len(self.paths):
+                obb = self.paths[idx].get('obb')
+                if isinstance(obb, QPolygonF) and obb.size() >= 4:
+                    tl, tr, br, bl = obb.at(0), obb.at(1), obb.at(2), obb.at(3)
+                    w = math.hypot(tr.x() - tl.x(), tr.y() - tl.y())
+                    h = math.hypot(bl.x() - tl.x(), bl.y() - tl.y())
+                    if w >= MIN_DIM and h >= MIN_DIM:
+                        self.master_obb = QPolygonF(obb)
+                        return
+                    else:
+                        cx = (tl.x() + br.x()) / 2.0
+                        cy = (tl.y() + br.y()) / 2.0
+                        scale_x = max(1.0, MIN_DIM / max(0.1, w))
+                        scale_y = max(1.0, MIN_DIM / max(0.1, h))
+                        expanded_obb = QPolygonF()
+                        for pt in (tl, tr, br, bl):
+                            expanded_obb.append(QPointF(
+                                cx + (pt.x() - cx) * scale_x,
+                                cy + (pt.y() - cy) * scale_y
+                            ))
+                        self.master_obb = expanded_obb
+                        return
+
+        # Multi-selection or fallback: axis-aligned bounding box of all strokes
         master_rect = QRectF()
         for idx in self.selected_path_indices:
             if idx < len(self.paths):
-                obb = self.paths[idx].get('obb', QPolygonF(self.paths[idx]['path'].boundingRect()))
-                master_rect = master_rect.united(obb.boundingRect())
+                obb = self.paths[idx].get('obb', self.paths[idx]['path'].boundingRect())
+                rect = obb if isinstance(obb, QRectF) else obb.boundingRect()
+                master_rect = master_rect.united(rect)
                 
-        if master_rect.width() < 50:
-            master_rect.adjust(- (50 - master_rect.width()) / 2, 0, (50 - master_rect.width()) / 2, 0)
-        if master_rect.height() < 50:
-            master_rect.adjust(0, - (50 - master_rect.height()) / 2, 0, (50 - master_rect.height()) / 2)
+        if master_rect.width() < MIN_DIM:
+            master_rect.adjust(- (MIN_DIM - master_rect.width()) / 2, 0, (MIN_DIM - master_rect.width()) / 2, 0)
+        if master_rect.height() < MIN_DIM:
+            master_rect.adjust(0, - (MIN_DIM - master_rect.height()) / 2, 0, (MIN_DIM - master_rect.height()) / 2)
             
         self.master_obb = QPolygonF(master_rect)
 
 
     def _get_selection_handles(self, obb):
         # obb is a QPolygonF with at least 4 points (0: TL, 1: TR, 2: BR, 3: BL)
-        if obb.size() < 4:
+        if obb is None or obb.size() < 4:
             return QPointF(), QPointF(), QPointF()
             
         tl = obb.at(0)
@@ -1038,64 +1240,93 @@ class OverlayWindow(QMainWindow):
         
         # 1. Rotation handle: extends straight UP from top center
         top_center = QPointF((tl.x() + tr.x()) / 2, (tl.y() + tr.y()) / 2)
-        rot_center = QPointF(top_center.x() + u_up.x() * 32, top_center.y() + u_up.y() * 32)
+        rot_center = QPointF(top_center.x() + u_up.x() * 28, top_center.y() + u_up.y() * 28)
         
         # 2. Delete handle: offset outward from Top-Right corner
-        del_center = QPointF(tr.x() + u_right.x() * 20 + u_up.x() * 20,
-                             tr.y() + u_right.y() * 20 + u_up.y() * 20)
+        del_center = QPointF(tr.x() + u_right.x() * 16 + u_up.x() * 16,
+                             tr.y() + u_right.y() * 16 + u_up.y() * 16)
                              
         # 3. Scale / Resize handle: offset outward from Bottom-Right corner
         scale_center = QPointF(br.x() + u_right.x() * 16 + u_down.x() * 16,
                                br.y() + u_right.y() * 16 + u_down.y() * 16)
         
         # --- Collision avoidance between handles ---
-        MIN_DIST = 36.0
+        MIN_DIST = 32.0
         
         # Check collision between Rotate and Delete (common on thin vertical shapes)
         d_rot_del = math.hypot(del_center.x() - rot_center.x(), del_center.y() - rot_center.y())
         if d_rot_del < MIN_DIST:
             overlap = MIN_DIST - d_rot_del
-            del_center = QPointF(del_center.x() + u_right.x() * (overlap + 8),
-                                 del_center.y() + u_right.y() * (overlap + 8))
-            rot_center = QPointF(rot_center.x() + u_up.x() * 8,
-                                 rot_center.y() + u_up.y() * 8)
+            del_center = QPointF(del_center.x() + u_right.x() * (overlap + 6),
+                                 del_center.y() + u_right.y() * (overlap + 6))
+            rot_center = QPointF(rot_center.x() + u_up.x() * 6,
+                                 rot_center.y() + u_up.y() * 6)
                                  
         # Check collision between Delete and Scale (common on thin horizontal shapes)
         d_del_scale = math.hypot(del_center.x() - scale_center.x(), del_center.y() - scale_center.y())
         if d_del_scale < MIN_DIST:
             overlap = MIN_DIST - d_del_scale
-            del_center = QPointF(del_center.x() + u_up.x() * (overlap / 2 + 6),
-                                 del_center.y() + u_up.y() * (overlap / 2 + 6))
-            scale_center = QPointF(scale_center.x() + u_down.x() * (overlap / 2 + 6),
-                                   scale_center.y() + u_down.y() * (overlap / 2 + 6))
+            del_center = QPointF(del_center.x() + u_up.x() * (overlap / 2 + 4),
+                                 del_center.y() + u_up.y() * (overlap / 2 + 4))
+            scale_center = QPointF(scale_center.x() + u_down.x() * (overlap / 2 + 4),
+                                   scale_center.y() + u_down.y() * (overlap / 2 + 4))
         
         return rot_center, del_center, scale_center
 
-    # ── Cache management (Two-Layer O(1) Accelerated Engine) ──
+    # ── Cache management (Two-Layer O(1) High-DPI Accelerated Engine) ──
 
-    def _init_canvas_cache(self):
+    def _sync_dpi_backing_store(self):
+        if not hasattr(self, 'paths'):
+            return
+        dpr = self.devicePixelRatioF()
         size = self.size()
         if size.width() <= 0 or size.height() <= 0:
             size = QSize(1920, 1080)
-        self.canvas_cache = QPixmap(size)
-        self.canvas_cache.fill(Qt.GlobalColor.transparent)
-        self._rebake_cache()
+        req_w = max(1, int(math.ceil(size.width() * dpr)))
+        req_h = max(1, int(math.ceil(size.height() * dpr)))
+
+        if (self.canvas_cache is None or 
+            self.canvas_cache.width() != req_w or 
+            self.canvas_cache.height() != req_h or 
+            abs(self.canvas_cache.devicePixelRatio() - dpr) > 1e-4):
+            
+            self.canvas_cache = QPixmap(req_w, req_h)
+            self.canvas_cache.setDevicePixelRatio(dpr)
+            self.canvas_cache.fill(Qt.GlobalColor.transparent)
+            self._rebake_cache()
+            self.update()
+
+    def _init_canvas_cache(self):
+        self._sync_dpi_backing_store()
 
     def resizeEvent(self, event):
         super().resizeEvent(event)
-        size = self.size()
-        if size.width() > 0 and size.height() > 0:
-            self.canvas_cache = QPixmap(size)
-            self.canvas_cache.fill(Qt.GlobalColor.transparent)
-            self._rebake_cache()
+        self._sync_dpi_backing_store()
+
+    def changeEvent(self, event):
+        if event.type() == QEvent.Type.DevicePixelRatioChange:
+            self._sync_dpi_backing_store()
+        super().changeEvent(event)
+
+    def showEvent(self, event):
+        super().showEvent(event)
+        win = self.windowHandle()
+        if win:
+            try:
+                win.screenChanged.disconnect(self._on_screen_changed)
+            except Exception:
+                pass
+            win.screenChanged.connect(self._on_screen_changed)
+
+    def _on_screen_changed(self, screen):
+        self._sync_dpi_backing_store()
 
     def _rebake_cache(self, exclude_indices=None):
-        if not self.canvas_cache or self.canvas_cache.isNull():
+        if not hasattr(self, 'paths') or not self.canvas_cache or self.canvas_cache.isNull():
             return
         self.canvas_cache.fill(Qt.GlobalColor.transparent)
         painter = QPainter(self.canvas_cache)
         painter.setRenderHint(QPainter.RenderHint.Antialiasing)
-        painter.setRenderHint(QPainter.RenderHint.SmoothPixmapTransform)
 
         exclude_set = set(exclude_indices) if exclude_indices else set()
 
@@ -1112,7 +1343,6 @@ class OverlayWindow(QMainWindow):
             return
         painter = QPainter(self.canvas_cache)
         painter.setRenderHint(QPainter.RenderHint.Antialiasing)
-        painter.setRenderHint(QPainter.RenderHint.SmoothPixmapTransform)
         self._draw_stroke(painter, stroke['path'], stroke['pen'], stroke['mode'],
                           stroke.get('points'), stroke.get('pressures'))
         painter.end()
@@ -1122,8 +1352,11 @@ class OverlayWindow(QMainWindow):
     def tabletEvent(self, event):
         """Handle pen tablet input with pressure sensitivity and eraser-end detection.
         Accepts the event to prevent Qt from also firing synthetic mouse events."""
+        if not self.ink_visible or self.is_click_through:
+            event.ignore()
+            return
+
         self._tablet_pressure = event.pressure()
-        self._tablet_active = True
 
         # Eraser-end auto-switch: flip stylus → eraser, flip back → restore previous tool
         try:
@@ -1141,21 +1374,38 @@ class OverlayWindow(QMainWindow):
 
         # Delegate to existing mouse handlers (QTabletEvent is API-compatible)
         evt_type = event.type()
-        if evt_type == event.Type.TabletPress:
+        if evt_type == QEvent.Type.TabletPress:
+            self._tablet_active = True
             self.mousePressEvent(event)
-        elif evt_type == event.Type.TabletMove:
-            self.mouseMoveEvent(event)
-        elif evt_type == event.Type.TabletRelease:
+        elif evt_type == QEvent.Type.TabletMove:
+            if getattr(self, '_tablet_active', False):
+                self.mouseMoveEvent(event)
+        elif evt_type == QEvent.Type.TabletRelease:
+            self.mouseReleaseEvent(event)   # commit stroke BEFORE clearing flag
             self._tablet_active = False
             self._tablet_pressure = 1.0
-            self.mouseReleaseEvent(event)
 
         event.accept()  # Prevent synthetic mouse event duplication
+
+    def focusOutEvent(self, event):
+        """Re-enable GC if focus is lost mid-stroke (e.g. Alt+Tab)."""
+        if not gc.isenabled():
+            gc.enable()
+        self.drawing = False
+        super().focusOutEvent(event)
+
+    def hideEvent(self, event):
+        """Re-enable GC if window is hidden mid-stroke."""
+        if not gc.isenabled():
+            gc.enable()
+        self.drawing = False
+        super().hideEvent(event)
 
     def mousePressEvent(self, event):
         if not self.ink_visible:
             return
-        if event.button() == Qt.MouseButton.LeftButton and not self.is_click_through:
+        if (event.button() == Qt.MouseButton.LeftButton or getattr(self, '_tablet_active', False)) and not self.is_click_through:
+            self.setFocus()
             if self.mode == ToolMode.SELECT:
                 self.selection_action = None
                 
@@ -1166,9 +1416,15 @@ class OverlayWindow(QMainWindow):
                     pos = event.position()
                     d_rot = math.hypot(pos.x() - rot_center.x(), pos.y() - rot_center.y())
                     d_del = math.hypot(pos.x() - del_center.x(), pos.y() - del_center.y())
-                    d_scale = math.hypot(pos.x() - scale_center.x(), pos.y() - scale_center.y())
                     
-                    HANDLE_RADIUS = 18
+                    # Bottom-right corner marker of master_obb
+                    br = self.master_obb.at(2) if self.master_obb.size() > 2 else scale_center
+                    d_scale = min(
+                        math.hypot(pos.x() - scale_center.x(), pos.y() - scale_center.y()),
+                        math.hypot(pos.x() - br.x(), pos.y() - br.y())
+                    )
+                    
+                    HANDLE_RADIUS = 22.0
                     min_dist = min(d_rot, d_del, d_scale)
                     
                     if min_dist <= HANDLE_RADIUS:
@@ -1176,47 +1432,70 @@ class OverlayWindow(QMainWindow):
                             self.selection_action = 'rotate'
                             self.selection_start_pos = event.position()
                             self.selection_start_master_obb = QPolygonF(self.master_obb)
-                            self.selection_start_states = [{'path': QPainterPath(self.paths[idx]['path']), 'obb': QPolygonF(self.paths[idx].get('obb', QPolygonF(self.paths[idx]['path'].boundingRect()))), 'index': idx} for idx in self.selected_path_indices if idx < len(self.paths)]
+                            self.selection_start_states = [{
+                                'path': QPainterPath(self.paths[idx]['path']),
+                                'obb': QPolygonF(self.paths[idx].get('obb', QPolygonF(self.paths[idx]['path'].boundingRect()))),
+                                'points': [QPointF(pt) for pt in self.paths[idx]['points']] if 'points' in self.paths[idx] else None,
+                                'index': idx
+                            } for idx in self.selected_path_indices if idx < len(self.paths)]
                             
                             center = QPointF((self.master_obb.at(0).x() + self.master_obb.at(2).x()) / 2, (self.master_obb.at(0).y() + self.master_obb.at(2).y()) / 2)
                             self.selection_start_center = center
-                            
-                            dy = event.position().y() - center.y()
-                            dx = event.position().x() - center.x()
-                            self.selection_rotation_start_angle = math.atan2(dy, dx)
+                            self.selection_rotation_start_angle = math.atan2(pos.y() - center.y(), pos.x() - center.x())
                             self._rebake_cache(exclude_indices=self.selected_path_indices)
+                            event.accept()
                             return
                             
                         elif min_dist == d_del:
-                            self.selection_action = None
+                            # Delete selected objects
                             for idx in sorted(self.selected_path_indices, reverse=True):
                                 if idx < len(self.paths):
                                     del self.paths[idx]
-                            self.selected_path_indices.clear()
-                            self._recalculate_master_obb()
                             self.undo_stack_size = min(self.undo_stack_size, len(self.paths))
+                            self.selected_path_indices.clear()
+                            self.master_obb = None
                             self._rebake_cache()
                             self.update()
+                            event.accept()
                             return
                             
                         elif min_dist == d_scale:
                             self.selection_action = 'scale'
                             self.selection_start_pos = event.position()
                             self.selection_start_master_obb = QPolygonF(self.master_obb)
-                            self.selection_start_states = [{'path': QPainterPath(self.paths[idx]['path']), 'obb': QPolygonF(self.paths[idx].get('obb', QPolygonF(self.paths[idx]['path'].boundingRect()))), 'index': idx, 'pen_width': self.paths[idx]['pen'].widthF()} for idx in self.selected_path_indices if idx < len(self.paths)]
-                            self.selection_start_center = QPointF((self.master_obb.at(0).x() + self.master_obb.at(2).x()) / 2, (self.master_obb.at(0).y() + self.master_obb.at(2).y()) / 2)
+                            self.selection_start_states = [{
+                                'path': QPainterPath(self.paths[idx]['path']),
+                                'obb': QPolygonF(self.paths[idx].get('obb', QPolygonF(self.paths[idx]['path'].boundingRect()))),
+                                'points': [QPointF(pt) for pt in self.paths[idx]['points']] if 'points' in self.paths[idx] else None,
+                                'pen_width': self.paths[idx]['pen'].widthF(),
+                                'index': idx
+                            } for idx in self.selected_path_indices if idx < len(self.paths)]
+                            center = QPointF((self.master_obb.at(0).x() + self.master_obb.at(2).x()) / 2, (self.master_obb.at(0).y() + self.master_obb.at(2).y()) / 2)
+                            self.selection_start_center = center
+                            content_rect = QRectF()
+                            for s in self.selection_start_states:
+                                content_rect = content_rect.united(s['path'].boundingRect())
+                            self.selection_start_max_dim = max(content_rect.width(), content_rect.height())
                             self._rebake_cache(exclude_indices=self.selected_path_indices)
+                            event.accept()
                             return
-                        
-                    elif self.master_obb.boundingRect().contains(event.position()):
-                        self.selection_action = 'drag'
-                        self.selection_start_pos = event.position()
-                        self.selection_start_master_obb = QPolygonF(self.master_obb)
-                        self.selection_start_states = [{'path': QPainterPath(self.paths[idx]['path']), 'obb': QPolygonF(self.paths[idx].get('obb', QPolygonF(self.paths[idx]['path'].boundingRect()))), 'index': idx} for idx in self.selected_path_indices if idx < len(self.paths)]
-                        self._rebake_cache(exclude_indices=self.selected_path_indices)
-                        return
                 
-                # 2. Check if clicked on a path directly
+                # 2. Check if clicked inside existing selection bounding box to drag it
+                if self.master_obb and self.master_obb.containsPoint(event.position(), Qt.FillRule.WindingFill):
+                    self.selection_action = 'drag'
+                    self.selection_start_pos = event.position()
+                    self.selection_start_master_obb = QPolygonF(self.master_obb)
+                    self.selection_start_states = [{
+                        'path': QPainterPath(self.paths[idx]['path']),
+                        'obb': QPolygonF(self.paths[idx].get('obb', QPolygonF(self.paths[idx]['path'].boundingRect()))),
+                        'points': [QPointF(pt) for pt in self.paths[idx]['points']] if 'points' in self.paths[idx] else None,
+                        'index': idx
+                    } for idx in self.selected_path_indices if idx < len(self.paths)]
+                    self._rebake_cache(exclude_indices=self.selected_path_indices)
+                    event.accept()
+                    return
+                
+                # 3. Check if clicking on an individual stroke to select it
                 clicked_idx = -1
                 hit_box = QRectF(event.position().x() - 10, event.position().y() - 10, 20, 20)
                 
@@ -1226,49 +1505,60 @@ class OverlayWindow(QMainWindow):
                     stroker.setWidth(max(10.0, self.paths[i]['pen'].widthF() + 4.0))
                     stroked_path = stroker.createStroke(p)
                     
-                    if stroked_path.intersects(hit_box) or p.intersects(hit_box):
+                    hit = stroked_path.intersects(hit_box) or p.intersects(hit_box)
+                    if not hit and 'points' in self.paths[i] and self.paths[i]['points']:
+                        hit = any(hit_box.contains(pt) for pt in self.paths[i]['points'])
+                    if hit:
                         clicked_idx = i
                         break
                         
                 if clicked_idx != -1:
-                    # Single click on an unselected item replaces selection
-                    if clicked_idx not in self.selected_path_indices:
-                        self.selected_path_indices = [clicked_idx]
-                        self._recalculate_master_obb()
+                    self.selected_path_indices = [clicked_idx]
+                    self._recalculate_master_obb()
                     self.selection_action = 'drag'
                     self.selection_start_pos = event.position()
-                    self.selection_start_states = [{'path': QPainterPath(self.paths[idx]['path']), 'obb': QPolygonF(self.paths[idx].get('obb', QPolygonF(self.paths[idx]['path'].boundingRect()))), 'index': idx} for idx in self.selected_path_indices if idx < len(self.paths)]
+                    self.selection_start_master_obb = QPolygonF(self.master_obb) if self.master_obb else None
+                    self.selection_start_states = [{
+                        'path': QPainterPath(self.paths[clicked_idx]['path']),
+                        'obb': QPolygonF(self.paths[clicked_idx].get('obb', QPolygonF(self.paths[clicked_idx]['path'].boundingRect()))),
+                        'points': [QPointF(pt) for pt in self.paths[clicked_idx]['points']] if 'points' in self.paths[clicked_idx] else None,
+                        'index': clicked_idx
+                    }]
                     self._rebake_cache(exclude_indices=self.selected_path_indices)
-                else:
-                    # Clicked empty space -> start lasso
-                    self.selected_path_indices.clear()
-                    self._recalculate_master_obb()
-                    self.is_lassoing = True
-                    self.lasso_path = QPainterPath()
-                    self.lasso_path.moveTo(event.position())
-                    
+                    self.update()
+                    event.accept()
+                    return
+                
+                # 4. Clicked empty space -> deselect previous and start lasso selection
+                had_selection = bool(self.selected_path_indices)
+                self.selected_path_indices.clear()
+                self.master_obb = None
+                if had_selection:
+                    self._rebake_cache()
+                self.is_lassoing = True
+                self.lasso_path = QPainterPath()
+                self.lasso_path.moveTo(event.position())
                 self.update()
+                event.accept()
                 return
 
-            if self.mode == ToolMode.PEN:
-                if QApplication.overrideCursor() is None:
-                    QApplication.setOverrideCursor(QCursor(Qt.CursorShape.BlankCursor))
-
-            self.shape_detected = False
+            self.drawing = True
             
-            # Disable GC during active drawing to prevent micro-stutters
+            # Disable GC during active drawing to prevent micro-stutter frame drops
             gc.disable()
-            
+
+            self.raw_points = [event.position()]
+            self.raw_pressures = [self._tablet_pressure]
+            self.shape_detected = False
+            self.shape_start = event.position()
+            self.last_erase_pos = event.position()
             if self.mode == ToolMode.ERASER:
-                self.last_erase_pos = event.position()
                 self._erase_at(event.position())
             elif self.mode == ToolMode.SHAPE:
-                self.drawing = True
-                self.shape_start = event.position()
                 self.current_path = QPainterPath()
+                self.current_path.moveTo(event.position())
                 self.last_point = event.position()
             else:
-                self.drawing = True
                 self.raw_points = [event.position()]
                 self.raw_pressures = [self._tablet_pressure]
                 self.current_path = QPainterPath()
@@ -1279,7 +1569,7 @@ class OverlayWindow(QMainWindow):
     def mouseMoveEvent(self, event):
         if not self.ink_visible:
             return
-        if (event.buttons() & Qt.MouseButton.LeftButton) and not self.is_click_through:
+        if ((event.buttons() & Qt.MouseButton.LeftButton) or getattr(self, '_tablet_active', False)) and not self.is_click_through:
             if self.mode == ToolMode.SELECT:
                 if self.is_lassoing and self.lasso_path is not None:
                     self.lasso_path.lineTo(event.position())
@@ -1294,8 +1584,9 @@ class OverlayWindow(QMainWindow):
                         if idx < len(self.paths):
                             self.paths[idx]['path'] = transform.map(state['path'])
                             self.paths[idx]['obb'] = transform.map(state['obb'])
-                    if self.selection_start_master_obb:
-                        self.master_obb = transform.map(self.selection_start_master_obb)
+                            if state.get('points') is not None:
+                                self.paths[idx]['points'] = [transform.map(pt) for pt in state['points']]
+                    self._recalculate_master_obb()
                     self.update()
                 elif self.selection_action == 'rotate' and self.selected_path_indices:
                     center = self.selection_start_center
@@ -1308,17 +1599,31 @@ class OverlayWindow(QMainWindow):
                         if idx < len(self.paths):
                             self.paths[idx]['path'] = transform.map(state['path'])
                             self.paths[idx]['obb'] = transform.map(state['obb'])
-                    if self.selection_start_master_obb:
-                        self.master_obb = transform.map(self.selection_start_master_obb)
+                            if state.get('points') is not None:
+                                self.paths[idx]['points'] = [transform.map(pt) for pt in state['points']]
+                    self._recalculate_master_obb()
                     self.update()
                 elif self.selection_action == 'scale' and self.selected_path_indices:
-                    start_dist = math.hypot(self.selection_start_pos.x() - self.selection_start_center.x(), 
-                                            self.selection_start_pos.y() - self.selection_start_center.y())
-                    current_dist = math.hypot(event.position().x() - self.selection_start_center.x(), 
-                                              event.position().y() - self.selection_start_center.y())
+                    vx_start = self.selection_start_pos.x() - self.selection_start_center.x()
+                    vy_start = self.selection_start_pos.y() - self.selection_start_center.y()
+                    start_dist = math.hypot(vx_start, vy_start)
                     
                     if start_dist > 0:
-                        scale_factor = current_dist / start_dist
+                        vx_curr = event.position().x() - self.selection_start_center.x()
+                        vy_curr = event.position().y() - self.selection_start_center.y()
+                        dot = vx_curr * vx_start + vy_curr * vy_start
+                        proj_dist = dot / start_dist
+                        
+                        start_max_dim = getattr(self, 'selection_start_max_dim', 100.0)
+                        MIN_DIM = 28.0
+                        min_scale = max(0.02, MIN_DIM / max(1.0, start_max_dim))
+                        max_scale = 50.0
+                        
+                        if proj_dist <= 0:
+                            scale_factor = min_scale
+                        else:
+                            scale_factor = max(min_scale, min(max_scale, proj_dist / start_dist))
+                            
                         transform = QTransform().translate(self.selection_start_center.x(), self.selection_start_center.y()) \
                                                 .scale(scale_factor, scale_factor) \
                                                 .translate(-self.selection_start_center.x(), -self.selection_start_center.y())
@@ -1328,16 +1633,17 @@ class OverlayWindow(QMainWindow):
                             if idx < len(self.paths):
                                 self.paths[idx]['path'] = transform.map(state['path'])
                                 self.paths[idx]['obb'] = transform.map(state['obb'])
-                                new_width = max(0.1, state['pen_width'] * scale_factor)
+                                if state.get('points') is not None:
+                                    self.paths[idx]['points'] = [transform.map(pt) for pt in state['points']]
+                                new_width = max(0.5, min(300.0, state.get('pen_width', self.paths[idx]['pen'].widthF()) * scale_factor))
                                 self.paths[idx]['pen'].setWidthF(new_width)
-                        if self.selection_start_master_obb:
-                            self.master_obb = transform.map(self.selection_start_master_obb)
+                        self._recalculate_master_obb()
                         self.update()
                 return
 
-            if self.mode == ToolMode.ERASER:
+            if self.drawing and self.mode == ToolMode.ERASER:
                 cur_pos = event.position()
-                last_pos = getattr(self, 'last_erase_pos', cur_pos)
+                last_pos = getattr(self, 'last_erase_pos', None) or cur_pos
                 self._erase_between(last_pos, cur_pos)
                 self.last_erase_pos = cur_pos
             elif self.drawing and self.mode == ToolMode.SHAPE:
@@ -1377,7 +1683,7 @@ class OverlayWindow(QMainWindow):
                     self.shape_timer.start(400)
 
     def mouseReleaseEvent(self, event):
-        if event.button() == Qt.MouseButton.LeftButton:
+        if (event.button() == Qt.MouseButton.LeftButton or getattr(self, '_tablet_active', False)):
             if self.mode == ToolMode.SELECT:
                 if self.is_lassoing and self.lasso_path is not None:
                     self.lasso_path.lineTo(event.position())
@@ -1387,29 +1693,49 @@ class OverlayWindow(QMainWindow):
                     
                     for i in range(len(self.paths)):
                         p = self.paths[i]['path']
-                        if self.lasso_path.intersects(p) or self.lasso_path.contains(p):
+                        contained = (self.lasso_path.intersects(p) or 
+                                     self.lasso_path.contains(p) or 
+                                     self.lasso_path.contains(p.boundingRect()))
+                        if not contained and 'points' in self.paths[i] and self.paths[i]['points']:
+                            contained = any(self.lasso_path.contains(pt) for pt in self.paths[i]['points'])
+                        if contained:
                             self.selected_path_indices.append(i)
                             
                     self._recalculate_master_obb()
                     self.is_lassoing = False
                     self.lasso_path = None
+                    # Rebake cache excluding selected strokes to prevent ghost/duplicate rendering
+                    self._rebake_cache(exclude_indices=self.selected_path_indices)
                     self.update()
                 
                 if self.selection_action in ('drag', 'rotate', 'scale'):
-                    self._rebake_cache()
+                    self._recalculate_master_obb()
+                    self._rebake_cache(exclude_indices=self.selected_path_indices)
                 self.selection_action = None
+                self.selection_start_states.clear()
                 return
 
             if self.mode == ToolMode.ERASER:
+                self.drawing = False
                 self.last_erase_pos = None
+                if not gc.isenabled():
+                    gc.enable()
 
             self.shape_timer.stop()
             while QApplication.overrideCursor() is not None:
                 QApplication.restoreOverrideCursor()
             self._update_cursor()
             if self.drawing and self.current_path:
+                if self.mode == ToolMode.SHAPE and (self.current_path.isEmpty() or self.current_path.elementCount() <= 1):
+                    self.current_path = None
+                    self.drawing = False
+                    self.update()
+                    return
+
                 if self.mode != ToolMode.SHAPE and not self.shape_detected:
                     self.current_path.lineTo(event.position())
+                    self.raw_points.append(event.position())
+                    self.raw_pressures.append(self._tablet_pressure)
 
                 popped_oldest = False
                 if len(self.paths) >= self.MAX_STROKES:
@@ -1427,8 +1753,8 @@ class OverlayWindow(QMainWindow):
                     'mode': self.mode,
                     'obb': obb,
                 }
-                # Store pressure data for variable-width rendering (pen & highlighter only)
-                if self.mode in (ToolMode.PEN, ToolMode.HIGHLIGHTER) and self.raw_pressures:
+                # Store pressure data for variable-width rendering (pen & highlighter only, not detected shapes)
+                if self.mode in (ToolMode.PEN, ToolMode.HIGHLIGHTER) and not self.shape_detected and self.raw_pressures:
                     stroke['points'] = list(self.raw_points)
                     stroke['pressures'] = list(self.raw_pressures)
                 self.paths.append(stroke)
@@ -1441,6 +1767,8 @@ class OverlayWindow(QMainWindow):
 
                 self.current_path = None
                 self.update()
+            self.raw_points = []
+            self.raw_pressures = []
             self.drawing = False
             
             # Re-enable GC and collect
@@ -1484,13 +1812,22 @@ class OverlayWindow(QMainWindow):
             p_stroker.setCapStyle(Qt.PenCapStyle.RoundCap)
             p_stroked = p_stroker.createStroke(p)
 
-            if p_stroked.intersects(stroked_sweep) or p.intersects(stroked_sweep) or p_stroked.intersects(sweep_path) or p.intersects(sweep_rect):
+            if p_stroked.intersects(stroked_sweep) or p.intersects(stroked_sweep) or p_stroked.intersects(sweep_path) or p.intersects(sweep_path):
                 self.paths.pop(i)
                 removed = True
+                # Re-index: loop is reverse so indices < i are stable; shift down indices > i
+                self.selected_path_indices = [
+                    (idx - 1 if idx > i else idx)
+                    for idx in self.selected_path_indices
+                    if idx != i  # drop erased stroke from selection
+                ]
 
         if removed:
             self.undo_stack_size = min(self.undo_stack_size, len(self.paths))
-            self._rebake_cache()
+            self._recalculate_master_obb()
+            self.raw_points = []
+            self.raw_pressures = []
+            self._rebake_cache(exclude_indices=self.selected_path_indices)
             self.update()
 
     # ── Shape detection ──
@@ -1507,6 +1844,8 @@ class OverlayWindow(QMainWindow):
         min_x, max_x = min(xs), max(xs)
         min_y, max_y = min(ys), max(ys)
         width, height = max_x - min_x, max_y - min_y
+        if width < 5 and height < 5:
+            return  # degenerate tap, not a shape
 
         path_length = sum(
             math.hypot(self.raw_points[i + 1].x() - self.raw_points[i].x(),
@@ -1530,6 +1869,8 @@ class OverlayWindow(QMainWindow):
     def _replace_current_path(self, new_path):
         self.shape_detected = True
         self.current_path = new_path
+        self.raw_points = []
+        self.raw_pressures = []
         self.update()
 
     # ── Painting ──
@@ -1544,29 +1885,32 @@ class OverlayWindow(QMainWindow):
             painter.fillRect(event.rect(), QColor(0, 0, 0, 2))
 
         if not self.ink_visible:
+            painter.end()
             return
 
         painter.setClipRect(event.rect())
         painter.setRenderHint(QPainter.RenderHint.Antialiasing)
-        painter.setRenderHint(QPainter.RenderHint.SmoothPixmapTransform)
 
         # 1. Blit cached background strokes (O(1) instant GPU blit)
         if self.canvas_cache and not self.canvas_cache.isNull():
             painter.drawPixmap(0, 0, self.canvas_cache)
 
-        # 2. Draw live actively transforming selected paths in SELECT mode
-        if self.mode == ToolMode.SELECT and self.selection_action in ('drag', 'rotate', 'scale') and self.selected_path_indices:
+        # 2. Draw selected paths as live vectors (excluded from cache during selection)
+        if self.mode == ToolMode.SELECT and self.selected_path_indices:
             for idx in self.selected_path_indices:
                 if idx < len(self.paths):
                     p = self.paths[idx]
                     self._draw_stroke(painter, p['path'], p['pen'], p['mode'],
                                       p.get('points'), p.get('pressures'))
         
-        # 3. Draw live active stroke
+        # 3. Draw live active stroke (Shapes render purely as vector path without pressure points)
         if self.drawing and self.current_path:
-            self._draw_stroke(painter, self.current_path, self._get_current_pen(), self.mode,
-                              self.raw_points if self.raw_points else None,
-                              self.raw_pressures if self.raw_pressures else None)
+            if self.mode == ToolMode.SHAPE:
+                self._draw_stroke(painter, self.current_path, self._get_current_pen(), self.mode)
+            else:
+                self._draw_stroke(painter, self.current_path, self._get_current_pen(), self.mode,
+                                  self.raw_points if self.raw_points else None,
+                                  self.raw_pressures if self.raw_pressures else None)
 
         painter.setOpacity(1.0)
         if self.mode == ToolMode.SELECT:
@@ -1578,13 +1922,6 @@ class OverlayWindow(QMainWindow):
             elif self.selected_path_indices and self.master_obb:
                 painter.setRenderHint(QPainter.RenderHint.Antialiasing)
                 
-                # Draw small outlines around individual items to show what's inside the group
-                painter.setPen(QPen(QColor(0, 122, 255, 100), 1, Qt.PenStyle.DashLine))
-                painter.setBrush(Qt.BrushStyle.NoBrush)
-                for idx in self.selected_path_indices:
-                    if idx < len(self.paths):
-                        obb = self.paths[idx].get('obb', QPolygonF(self.paths[idx]['path'].boundingRect()))
-                        painter.drawPolygon(obb)
 
                 master_obb = self.master_obb
                 
@@ -1642,12 +1979,23 @@ class OverlayWindow(QMainWindow):
                 painter.drawLine(QPointF(scale_center.x()+4, scale_center.y()+4), QPointF(scale_center.x()+1, scale_center.y()+4))
 
     def keyPressEvent(self, event):
+        if event.key() == Qt.Key.Key_Escape:
+            if self.mode == ToolMode.SELECT and self.selected_path_indices:
+                self.selected_path_indices.clear()
+                self.selection_action = None
+                self.selection_start_states.clear()
+                self._recalculate_master_obb()
+                self._rebake_cache()
+                self.update()
+                return
         if event.key() == Qt.Key.Key_Delete or event.key() == Qt.Key.Key_Backspace:
             if self.mode == ToolMode.SELECT and self.selected_path_indices:
                 for idx in sorted(self.selected_path_indices, reverse=True):
                     if idx < len(self.paths):
                         self.paths.pop(idx)
                 self.selected_path_indices.clear()
+                self.selection_action = None
+                self.selection_start_states.clear()
                 self._recalculate_master_obb()
                 self.undo_stack_size = min(self.undo_stack_size, len(self.paths))
                 self._rebake_cache()
@@ -1658,20 +2006,41 @@ class OverlayWindow(QMainWindow):
     # ── Actions ──
 
     def clear_screen(self):
+        self.shape_timer.stop()          # cancel any pending shape detection
+        if not gc.isenabled():
+            gc.enable()
         self.paths.clear()
         self.undo_stack_size = 0
+        self.raw_points = []
+        self.raw_pressures = []
+        self.current_path = None
+        self.drawing = False
+        self.is_lassoing = False
+        self.lasso_path = None
+        self.selection_action = None
+        self.selection_start_states.clear()
         self.selected_path_indices.clear()
         self._recalculate_master_obb()
         self._rebake_cache()
         self.update()
 
     def undo(self):
+        if not gc.isenabled():
+            gc.enable()
+        self.drawing = False
+        self.current_path = None
+        self.is_lassoing = False
+        self.lasso_path = None
         if self.paths and self.undo_stack_size > 0:
             self.paths.pop()
             self.undo_stack_size -= 1
+            self.raw_points = []
+            self.raw_pressures = []
+            self.selection_action = None
+            self.selection_start_states.clear()
             self.selected_path_indices = [idx for idx in self.selected_path_indices if idx < len(self.paths)]
             self._recalculate_master_obb()
-            self._rebake_cache()
+            self._rebake_cache(exclude_indices=self.selected_path_indices)
             self.update()
 
 
@@ -1680,6 +2049,8 @@ class OverlayWindow(QMainWindow):
 class FloatingColorPalette(FloatingPanel):
     def __init__(self, signals, parent=None):
         super().__init__(signals, parent)
+        self.is_detached = False
+        self.toolbar = None
 
         layout = QVBoxLayout()
         layout.setContentsMargins(15, 8, 15, 15)
@@ -1721,7 +2092,7 @@ class FloatingColorPalette(FloatingPanel):
             tooltip_color = "#333333" if c.upper() == "#FFFFFF" else c
             if c.upper() == active_color:
                 btn.setStyleSheet(f"QPushButton {{ background-color: {c}; border-radius: 14px; border: 2px solid {c}; }} QToolTip {{ background-color: white; color: {tooltip_color}; border: 1px solid {tooltip_color}; }}")
-                shadow = QGraphicsDropShadowEffect(self)
+                shadow = QGraphicsDropShadowEffect(btn)
                 shadow.setBlurRadius(15)
                 shadow.setColor(QColor(c))
                 shadow.setOffset(0, 0)
@@ -1760,6 +2131,8 @@ class ToolbarWindow(QWidget):
         self.signals = signals
         self.active_tool_btn = None
         self.has_been_dragged = False
+        self._press_mouse_global = None
+        self._press_window_pos = None
 
         self.setWindowFlags(
             Qt.WindowType.Tool |
@@ -1903,13 +2276,13 @@ class ToolbarWindow(QWidget):
             self._update_cursor_button_icon()
             self.start_collapse()
         else:
+            self._update_cursor_button_icon()
             self.start_expand()
 
     def _select_shape(self, shape_type):
         self.current_shape_type = shape_type
         self.btn_shape.setText("")
         self.btn_shape.setIcon(create_shape_icon(shape_type))
-        from PyQt6.QtCore import QSize
         self.btn_shape.setIconSize(QSize(24, 24))
         self._set_active_tool(self.btn_shape, lambda: self.signals.switch_shape.emit(shape_type))
         self.shape_menu.hide_menu()
@@ -1952,19 +2325,8 @@ class ToolbarWindow(QWidget):
         for label, size in zip(["Mini", "Small", "Medium", "Big", "Large"], sizes):
             menu.addAction(label, lambda checked=False, s=size: signal_emitter(s))
         def _show_size_menu(b=btn, m=menu):
-            # Smart position: prefer right of button, clamp to screen
-            btn_global = b.mapToGlobal(QPoint(0, 0))
-            btn_rect = QRect(btn_global, b.size())
-            screen = QApplication.screenAt(btn_rect.center()) or QApplication.primaryScreen()
-            avail = screen.availableGeometry()
-            # Prefer right of button
-            x = btn_rect.right() + 5
-            if x + 120 > avail.right():  # 120px estimated menu width
-                x = btn_rect.left() - 120 - 5
-            x = max(avail.left() + 5, x)
-            y = btn_rect.top()
-            y = max(avail.top() + 5, min(avail.bottom() - 100, y))
-            m.exec(QPoint(x, y))
+            pos = FloatingPanel._smart_position(m, b, prefer_left=False, gap=5)
+            m.exec(pos)
         btn.hold_triggered.connect(_show_size_menu)
 
     def _set_active_tool(self, btn, callback):
@@ -2002,6 +2364,7 @@ class ToolbarWindow(QWidget):
             self.btn_cursor.setText("🙈")
             self.btn_cursor.setToolTip("Click to Unhide")
             self.btn_cursor.setStyleSheet("")
+            self.cursor_menu.add_action("🐵", "enable(canvas)", self._on_cursor_action_visibility)
         elif is_cursor_active:
             self.btn_cursor.setText("🐒")
             self.btn_cursor.setToolTip("")
@@ -2018,13 +2381,12 @@ class ToolbarWindow(QWidget):
     def _add_button(self, layout, icon, tooltip, callback):
         btn = QPushButton()
         btn.setText(icon)
-        btn.setToolTip(tooltip)
         btn.setFixedSize(36, 36)
         btn.setCursor(Qt.CursorShape.PointingHandCursor)
         btn.setMouseTracking(True)
         btn.setAttribute(Qt.WidgetAttribute.WA_Hover, True)
-        btn.setAttribute(Qt.WidgetAttribute.WA_AlwaysShowToolTips, True)
         btn.clicked.connect(callback)
+        _install_fade_tooltip(btn, tooltip)  # use custom fade tooltip, not native flickering one
         layout.addWidget(btn, alignment=Qt.AlignmentFlag.AlignCenter)
         return btn
 
@@ -2043,8 +2405,11 @@ class ToolbarWindow(QWidget):
         if self._collapse_state == 3:  # Currently expanding — reverse it
             self._height_anim.stop()
 
+        # Capture full height BEFORE changing state (check requires state == 0)
+        if getattr(self, '_full_height', None) is None or self._collapse_state == 0:
+            self._full_height = max(self.height(), self.sizeHint().height(), 557)
+
         self._collapse_state = 1  # COLLAPSING
-        self._full_height = self.height() if self.height() > 100 else (self._full_height or 557)
 
         # Lock current height so hiding buttons doesn't cause visual jump
         self.setFixedHeight(self._full_height)
@@ -2079,6 +2444,14 @@ class ToolbarWindow(QWidget):
 
         current_h = self.height()
         target_h = self._full_height or 557
+
+        # Screen overflow guard: nudge toolbar up if full-size would go off-screen
+        screen = QApplication.screenAt(self.geometry().center())
+        if screen:
+            avail = screen.availableGeometry()
+            if self.y() + target_h > avail.bottom():
+                new_y = max(avail.top(), avail.bottom() - target_h - 4)
+                self.move(self.x(), new_y)
 
         # Ensure collapsible widgets remain hidden during the height transition
         for w in self._collapsible_widgets:
@@ -2122,25 +2495,58 @@ class ToolbarWindow(QWidget):
 
     def mousePressEvent(self, event):
         if event.button() == Qt.MouseButton.LeftButton:
-            self._drag_pos = event.globalPosition().toPoint()
+            self._press_mouse_global = event.globalPosition().toPoint()
+            self._press_window_pos = self.pos()
+            if hasattr(self, 'signals') and self.signals and hasattr(self.signals, 'dismiss_transient_flyouts'):
+                self.signals.dismiss_transient_flyouts.emit()
+            if hasattr(FadeTooltip, 'instance') and FadeTooltip.instance():
+                FadeTooltip.instance().hide_immediately()
             event.accept()
         else:
             super().mousePressEvent(event)
 
     def mouseMoveEvent(self, event):
-        if getattr(self, '_drag_pos', None) is not None:
-            delta = event.globalPosition().toPoint() - self._drag_pos
-            self.move(self.pos() + delta)
-            self._drag_pos = event.globalPosition().toPoint()
+        if hasattr(self, '_press_mouse_global') and self._press_mouse_global is not None and hasattr(self, '_press_window_pos') and self._press_window_pos is not None:
+            mouse_vector = event.globalPosition().toPoint() - self._press_mouse_global
+            unconstrained_pos = self._press_window_pos + mouse_vector
+            
+            if hasattr(self, 'btn_handle') and self.btn_handle is not None:
+                h_x, h_y = self.btn_handle.x(), self.btn_handle.y()
+                h_w, h_h = self.btn_handle.width(), self.btn_handle.height()
+            else:
+                h_x, h_y = 20, 8
+                h_w, h_h = 40, 12
+                
+            unconstrained_handle_rect = QRect(unconstrained_pos.x() + h_x,
+                                              unconstrained_pos.y() + h_y,
+                                              h_w, h_h)
+            screen = (QApplication.screenAt(unconstrained_handle_rect.center()) or 
+                      QApplication.screenAt(event.globalPosition().toPoint()) or 
+                      QApplication.primaryScreen())
+            avail = screen.availableGeometry()
+            margin = 4
+            
+            clamped_handle_x = max(avail.left() + margin, 
+                                   min(avail.right() - h_w - margin, unconstrained_handle_rect.left()))
+            clamped_handle_y = max(avail.top() + margin, 
+                                   min(avail.bottom() - h_h - margin, unconstrained_handle_rect.top()))
+            
+            clamped_parent_pos = QPoint(clamped_handle_x - h_x, clamped_handle_y - h_y)
+            old_pos = self.pos()
+            self.move(clamped_parent_pos)
             self.has_been_dragged = True
-            if hasattr(self, 'signals') and hasattr(self.signals, 'toolbar_moved'):
-                self.signals.toolbar_moved.emit(delta)
+            
+            actual_delta = clamped_parent_pos - old_pos
+            if not actual_delta.isNull():
+                if hasattr(self, 'signals') and hasattr(self.signals, 'toolbar_moved'):
+                    self.signals.toolbar_moved.emit(actual_delta)
             event.accept()
         else:
             super().mouseMoveEvent(event)
 
     def mouseReleaseEvent(self, event):
-        self._drag_pos = None
+        self._press_mouse_global = None
+        self._press_window_pos = None
         super().mouseReleaseEvent(event)
 
     def paintEvent(self, event):
@@ -2155,20 +2561,17 @@ class ToolbarWindow(QWidget):
     def moveEvent(self, event):
         super().moveEvent(event)
         if hasattr(self, 'shape_menu') and self.shape_menu and self.shape_menu.isVisible() and self.shape_menu._fade_state in (1, 2):
-            if not self.shape_menu.has_been_dragged:
-                pos = FloatingPanel._smart_position(self.shape_menu, self.btn_shape)
-                self.shape_menu.move(pos)
+            pos = FloatingPanel._smart_position(self.shape_menu, self.btn_shape, prefer_left=True, gap=5)
+            self.shape_menu.move(pos)
         if hasattr(self, 'cursor_menu') and self.cursor_menu and self.cursor_menu.isVisible() and self.cursor_menu._fade_state in (1, 2):
-            if not self.cursor_menu.has_been_dragged:
-                pos = FloatingPanel._smart_position(self.cursor_menu, self.btn_cursor)
-                self.cursor_menu.move(pos)
+            pos = FloatingPanel._smart_position(self.cursor_menu, self.btn_cursor, prefer_left=True, gap=5)
+            self.cursor_menu.move(pos)
 
 
 # ── System Tray ──
 
 def resource_path(relative_path):
     """ Get absolute path to resource, works for dev and for PyInstaller """
-    import os
     try:
         # PyInstaller creates a temp folder and stores path in _MEIPASS
         base_path = sys._MEIPASS
@@ -2244,11 +2647,13 @@ class MainAppCoordinator(QObject):
 
         self.toolbar = ToolbarWindow(self.signals, parent=self.overlay)
         self.toolbar.resize(80, 400)
+        self.toolbar.main_coordinator = self
         screen_rect = QApplication.primaryScreen().geometry()
         self.toolbar.move(screen_rect.right() - 100, screen_rect.top() + 20)
         self.toolbar.show()
 
         self.color_palette = FloatingColorPalette(self.signals, parent=self.overlay)
+        self.color_palette.toolbar = self.toolbar
         self.color_palette.resize(150, 150)
         self.color_palette.hide()
 
@@ -2259,6 +2664,7 @@ class MainAppCoordinator(QObject):
         # Connect toggle signals
         self.signals.toggle_color_palette.connect(self.toggle_color_palette)
         self.signals.toolbar_moved.connect(self._sync_toolboxes_position)
+        self.signals.dismiss_transient_flyouts.connect(self._dismiss_transient_flyouts)
         self.signals.toggle_shape_toolbox.connect(self._toggle_shape_toolbox)
         self.signals.exit_app.connect(self._quit_app)
 
@@ -2322,9 +2728,18 @@ class MainAppCoordinator(QObject):
         # Refresh the cursor to reflect restored sizes/colors
         self.overlay._update_cursor()
 
+        # Sync color palette button selection
+        saved_pen_color = s.get('pen_color')
+        if saved_pen_color and hasattr(self, 'color_palette') and self.color_palette:
+            self.color_palette._sync_color_selection(saved_pen_color)
+
     def _save_color(self, hex_color):
         """Save the color to the correct key based on current mode."""
-        if self.overlay.mode == ToolMode.HIGHLIGHTER:
+        mode = self.overlay.mode
+        if mode == ToolMode.SELECT:
+            # Recoloring a selected stroke — don't overwrite pen/highlighter saved color
+            return
+        if mode == ToolMode.HIGHLIGHTER:
             self.settings.set('highlighter_color', hex_color)
         else:
             self.settings.set('pen_color', hex_color)
@@ -2344,6 +2759,9 @@ class MainAppCoordinator(QObject):
 
     def wakeup(self):
         """Called when a duplicate instance tries to launch. Show and raise the toolbar."""
+        # If ink was hidden, restore it so the app is immediately usable
+        if not getattr(self.overlay, 'ink_visible', True):
+            self.signals.toggle_visibility.emit()
         self.toolbar.show()
         self.toolbar.raise_()
         self.toolbar.activateWindow()
@@ -2352,6 +2770,10 @@ class MainAppCoordinator(QObject):
 
     def hide_toolboxes(self):
         """Instantly close everything (used during canvas hide)."""
+        # Cancel any lingering or pending fade tooltip first
+        tip = FadeTooltip.instance()
+        if tip:
+            tip.cancel()
         if self.shape_toolbox.isVisible() or self.shape_toolbox._fade_state != 0:
             self.shape_toolbox.instant_hide()
         if self.color_palette.isVisible() or self.color_palette._fade_state != 0:
@@ -2364,6 +2786,10 @@ class MainAppCoordinator(QObject):
 
     def _hide_popup_menus(self):
         """Close popup menus and shape toolbox with fade, but NEVER the color palette."""
+        # Cancel any lingering or pending fade tooltip
+        tip = FadeTooltip.instance()
+        if tip:
+            tip.cancel()
         if self.shape_toolbox._fade_state in (1, 2):
             self.shape_toolbox.fade_out()
         if hasattr(self.toolbar, 'cursor_menu') and self.toolbar.cursor_menu.isVisible():
@@ -2390,32 +2816,45 @@ class MainAppCoordinator(QObject):
             self._palette_was_visible = False
             self.color_palette.fade_in()
 
+    def _dismiss_transient_flyouts(self):
+        """Instantly dismiss open transient toolbar menus when dragging starts."""
+        if hasattr(self.toolbar, 'shape_menu') and self.toolbar.shape_menu and self.toolbar.shape_menu.isVisible():
+            self.toolbar.shape_menu.hide_menu()
+        if hasattr(self.toolbar, 'cursor_menu') and self.toolbar.cursor_menu and self.toolbar.cursor_menu.isVisible():
+            self.toolbar.cursor_menu.hide_menu()
+
     def _sync_toolboxes_position(self, delta):
-        if not self.color_palette.has_been_dragged:
-            self.color_palette.move(self.color_palette.pos() + delta)
-        if not self.shape_toolbox.has_been_dragged:
-            self.shape_toolbox.move(self.shape_toolbox.pos() + delta)
+        if self.color_palette.isVisible() and self.color_palette._fade_state in (1, 2):
+            if not getattr(self.color_palette, 'is_detached', False):
+                pos = FloatingPanel._smart_position(self.color_palette, self.toolbar.btn_palette, prefer_left=True, gap=5)
+                self.color_palette.move(pos)
+        if hasattr(self, 'shape_toolbox') and self.shape_toolbox.isVisible() and self.shape_toolbox._fade_state in (1, 2):
+            if not getattr(self.shape_toolbox, 'is_detached', False):
+                pos = FloatingPanel._smart_position(self.shape_toolbox, self.toolbar.btn_shape, prefer_left=True, gap=5)
+                self.shape_toolbox.move(pos)
 
     def toggle_color_palette(self):
         if self.color_palette._fade_state in (1, 2):
             self.color_palette.fade_out()
         else:
-            if not self.color_palette.has_been_dragged:
-                pos = FloatingPanel._smart_position(self.color_palette, self.toolbar.btn_palette)
+            if not getattr(self.color_palette, 'is_detached', False):
+                # Docked mode: close toolbar flyouts to prevent 56px overlap
+                if hasattr(self.toolbar, 'shape_menu') and self.toolbar.shape_menu and self.toolbar.shape_menu.isVisible():
+                    self.toolbar.shape_menu.hide_menu()
+                if hasattr(self.toolbar, 'cursor_menu') and self.toolbar.cursor_menu and self.toolbar.cursor_menu.isVisible():
+                    self.toolbar.cursor_menu.hide_menu()
+                pos = FloatingPanel._smart_position(self.color_palette, self.toolbar.btn_palette, prefer_left=True, gap=5)
                 self.color_palette.move(pos)
-            elif self._clamp_to_screen(self.color_palette):
-                pass  # clamped in-place if dragged off-screen
+            else:
+                self._clamp_to_screen(self.color_palette)
             self.color_palette.fade_in()
 
     def _toggle_shape_toolbox(self):
         if self.shape_toolbox._fade_state in (1, 2):
             self.shape_toolbox.fade_out()
         else:
-            if not self.shape_toolbox.has_been_dragged:
-                pos = FloatingPanel._smart_position(self.shape_toolbox, self.toolbar.btn_shape)
-                self.shape_toolbox.move(pos)
-            elif self._clamp_to_screen(self.shape_toolbox):
-                pass  # clamped in-place if dragged off-screen
+            pos = FloatingPanel._smart_position(self.shape_toolbox, self.toolbar.btn_shape, prefer_left=True, gap=5)
+            self.shape_toolbox.move(pos)
             self.shape_toolbox.fade_in()
 
     def _clamp_to_screen(self, panel):
@@ -2433,6 +2872,9 @@ class MainAppCoordinator(QObject):
 
     def _quit_app(self):
         """Cleanly shut down the application, saving final state."""
+        if getattr(self, '_quit_called', False):
+            return  # Guard: prevent double-execution (exit_app + aboutToQuit)
+        self._quit_called = True
         # Save toolbar position on exit
         self._save_toolbar_position()
         # Save current sizes one last time
@@ -2462,4 +2904,5 @@ if __name__ == '__main__':
 
     coordinator = MainAppCoordinator()
     guard.wakeup.connect(coordinator.wakeup)
+    app.aboutToQuit.connect(coordinator._quit_app)  # save settings on OS shutdown
     sys.exit(app.exec())
