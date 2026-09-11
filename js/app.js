@@ -246,7 +246,9 @@ class App {
     if (shapesBtn && shapesFlyout) {
       shapesBtn.addEventListener('click', (e) => {
         e.stopPropagation();
-        this.showRestrictedToast();
+        const isOpen = shapesFlyout.style.display === 'flex';
+        this._closeAllPopovers();
+        shapesFlyout.style.display = isOpen ? 'none' : 'flex';
       });
 
       shapesFlyout.querySelectorAll('[data-shape]').forEach(shapeItem => {
