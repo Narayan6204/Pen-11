@@ -1,9 +1,30 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
+<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9"
+        xmlns:image="http://www.google.com/schemas/sitemap-image/1.1">
   <url>
-    <loc>https://narayan6204.github.io/Pen-11/</loc>
-    <lastmod>2026-08-19</lastmod>
+    <loc>https://pen-11.pages.dev/</loc>
+    <lastmod>2026-09-11</lastmod>
     <changefreq>weekly</changefreq>
     <priority>1.0</priority>
+    <image:image>
+      <image:loc>https://pen-11.pages.dev/assets/screenshot.png</image:loc>
+      <image:title>Pen 11 Screen Annotation Tool for Windows 11</image:title>
+      <image:caption>Pen 11 Screen Annotation Tool for Windows 11</image:caption>
+    </image:image>
+    <image:image>
+      <image:loc>https://pen-11.pages.dev/assets/screenshot_palette.png</image:loc>
+      <image:title>Pen 11 Color Palette and Size Flyout</image:title>
+      <image:caption>Pen 11 Color Palette and Size Flyout</image:caption>
+    </image:image>
+    <image:image>
+      <image:loc>https://pen-11.pages.dev/assets/screenshot_shapes.png</image:loc>
+      <image:title>Pen 11 Smart Geometric Vector Shapes</image:title>
+      <image:caption>Pen 11 Smart Geometric Vector Shapes</image:caption>
+    </image:image>
+    <image:image>
+      <image:loc>https://pen-11.pages.dev/assets/screenshot_cursor.png</image:loc>
+      <image:title>Pen 11 Cursor Modes and Minimal Pill</image:title>
+      <image:caption>Pen 11 Cursor Modes and Minimal Pill</image:caption>
+    </image:image>
   </url>
 </urlset>
