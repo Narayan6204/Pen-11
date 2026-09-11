@@ -612,31 +612,50 @@
 /* --------------------------------------------------------------------------
    5. Mobile Smartphone Responsive Rules (<600px)
    -------------------------------------------------------------------------- */
+@media (max-width: 839px) {
+  #canvas-stage-wrapper {
+    touch-action: pan-y !important;
+  }
+}
+
 @media (max-width: 599px) {
   .pen-toolbar-container {
-    top: 8px !important;
-    right: 8px !important;
-    padding: 6px 5px 8px 5px;
-    gap: 4px;
-    border-radius: 16px;
-    max-height: calc(100% - 16px);
+    position: absolute;
+    top: auto !important;
+    bottom: 12px !important;
+    left: 50% !important;
+    right: auto !important;
+    transform: translateX(-50%);
+    flex-direction: row;
+    height: 46px;
+    max-height: 46px;
+    width: auto;
+    max-width: calc(100% - 16px);
+    padding: 4px 8px;
+    border-radius: 23px;
+    overflow-x: auto;
+    overflow-y: hidden;
+    gap: 6px;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  /* When upward popover is active, allow it to break out without clipping */
+  .pen-toolbar-container:has(.toolbar-palette-popover[style*="flex"]),
+  .pen-toolbar-container:has(.toolbar-shape-flyout[style*="flex"]),
+  .pen-toolbar-container:has(.toolbar-monkey-flyout[style*="flex"]) {
+    overflow: visible !important;
   }
 
   .toolbar-drag-handle {
-    width: 32px;
-    height: 10px;
-    margin-bottom: 0;
-  }
-
-  .toolbar-drag-pill {
-    width: 22px;
-    height: 4px;
+    display: none !important;
   }
 
   .toolbar-divider {
-    width: 20px;
-    height: 2px;
-    margin: 1px 0;
+    width: 2px;
+    height: 20px;
+    min-height: 20px;
+    max-height: 20px;
+    margin: 0 1px;
   }
 
   .toolbar-tool-btn {
@@ -658,11 +677,27 @@
     height: 18px;
   }
 
+  /* Anchor popovers cleanly within screen bounds on mobile */
+  .toolbar-palette-popover,
+  .toolbar-shape-flyout {
+    bottom: calc(100% + 8px) !important;
+    top: auto !important;
+    right: 0 !important;
+    left: auto !important;
+    transform: none !important;
+  }
+
+  .toolbar-monkey-flyout {
+    bottom: calc(100% + 8px) !important;
+    top: auto !important;
+    left: 0 !important;
+    right: auto !important;
+    transform: none !important;
+  }
+
   .toolbar-palette-popover {
-    top: 0 !important;
-    right: calc(100% + 6px) !important;
     padding: 8px 10px 10px 10px;
-    max-width: calc(100vw - 72px);
+    max-width: calc(100vw - 24px);
     border-radius: 16px;
   }
 
@@ -684,8 +719,6 @@
   }
 
   .toolbar-shape-flyout {
-    top: 0 !important;
-    right: calc(100% + 6px) !important;
     padding: 8px 10px 10px 10px;
     border-radius: 16px;
   }
@@ -708,8 +741,6 @@
   }
 
   .toolbar-monkey-flyout {
-    top: 0 !important;
-    right: calc(100% + 6px) !important;
     padding: 4px 6px;
     gap: 4px;
     border-radius: 20px;

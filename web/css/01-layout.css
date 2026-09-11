@@ -87,7 +87,13 @@ button, input, select, textarea {
   }
 }
 
-@media (min-width: 600px) {
+@media (max-width: 839px) {
+  .m3-main-content {
+    padding-bottom: calc(76px + env(safe-area-inset-bottom, 0px));
+  }
+}
+
+@media (min-width: 840px) {
   .m3-main-content {
     padding-bottom: 0;
   }
@@ -195,12 +201,40 @@ button, input, select, textarea {
 .m3-top-app-bar-nav {
   display: none;
   align-items: center;
-  gap: 8px;
+  gap: 4px;
+  flex-shrink: 1;
+  min-width: 0;
 }
 
 @media (min-width: 840px) {
   .m3-top-app-bar-nav {
     display: flex;
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+    white-space: nowrap;
+    scrollbar-width: none;
+  }
+
+  .m3-top-app-bar-nav::-webkit-scrollbar {
+    display: none;
+  }
+
+  .m3-top-app-bar-nav .m3-btn {
+    padding: 0 10px;
+    font-size: 0.8125rem;
+    flex-shrink: 0;
+    white-space: nowrap;
+  }
+}
+
+@media (min-width: 1440px) {
+  .m3-top-app-bar-nav {
+    gap: 8px;
+  }
+
+  .m3-top-app-bar-nav .m3-btn {
+    padding: 0 12px;
+    font-size: 0.875rem;
   }
 }
 
@@ -353,6 +387,10 @@ button, input, select, textarea {
   color: var(--md-sys-color-on-surface-variant);
   transition: color var(--md-sys-motion-duration-short4) var(--md-sys-motion-easing-standard),
               font-weight var(--md-sys-motion-duration-short4) var(--md-sys-motion-easing-standard);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 60px;
 }
 
 .m3-nav-item.active .m3-nav-label {

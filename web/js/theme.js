@@ -50,6 +50,7 @@ export const THEME_SEEDS = {
  * @returns {{r: number, g: number, b: number}}
  */
 export function hexToRgb(hex) {
+  if (!hex || typeof hex !== 'string') return { r: 0, g: 0, b: 0 };
   const cleanHex = hex.replace('#', '');
   const bigint = parseInt(cleanHex.length === 3 
     ? cleanHex.split('').map(c => c + c).join('') 
@@ -148,7 +149,7 @@ export function getContrastRatio(hex1, hex2) {
  * Generates an M3 Tonal Palette (tones 0..100) from H, S base
  */
 export function generateTonalPalette(hue, chroma) {
-  const tones = [0, 10, 20, 30, 40, 50, 60, 70, 80, 90, 95, 98, 99, 100];
+  const tones = [0, 4, 6, 10, 12, 17, 20, 22, 24, 30, 40, 50, 60, 70, 80, 87, 90, 92, 94, 95, 96, 98, 99, 100];
   const palette = {};
 
   tones.forEach(tone => {
