@@ -2,6 +2,27 @@
 
 ---
 
+## Session - 2026-10-18 20:05 IST (Modifier Wheel Scrolling)
+
+### What Was Done
+- Added Ctrl/Alt + mouse-wheel forwarding from drawing modes to the application underneath the fullscreen overlay.
+- Preserved drawing priority while the left mouse button is held.
+- Added typed 64-bit Win32 API prototypes and success checks for wheel message forwarding.
+- Added regression coverage for modifier gating and active-drawing priority, and documented the behavior in README.
+
+### Key Decisions Made
+- Keep ordinary wheel input unchanged and require Ctrl or Alt to avoid accidental page movement while annotating.
+- Forward native vertical/horizontal wheel messages instead of implementing browser-specific scrolling.
+
+### Problems Found / Known Issues
+- The behavior still needs manual verification in browsers, PDFs, and presentation software on a physical Windows desktop.
+
+### Confidence Level
+- HIGH - Six focused tests, the Qt smoke test, compilation, and a focused Windows API review passed.
+
+### Next Steps
+- Rebuild and publish the wheel-scrolling feature if the user wants it included in the downloadable release.
+
 ## Session - 2026-10-18 16:57 IST (Windows Patch Build)
 
 ### What Was Done

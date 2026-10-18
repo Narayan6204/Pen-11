@@ -9,6 +9,7 @@ if sys.platform != "win32":
     sys.exit(1)
 
 import ctypes
+from ctypes import wintypes
 import math
 import keyboard
 import os
@@ -53,6 +54,23 @@ GWL_EXSTYLE       = -20
 _user32 = ctypes.windll.user32
 _GetWindowLong = _user32.GetWindowLongPtrW if ctypes.sizeof(ctypes.c_void_p) == 8 else _user32.GetWindowLongW
 _SetWindowLong = _user32.SetWindowLongPtrW if ctypes.sizeof(ctypes.c_void_p) == 8 else _user32.SetWindowLongW
+_WindowFromPoint = _user32.WindowFromPoint
+_PostMessage = _user32.PostMessageW
+_user32.GetCursorPos.argtypes = [ctypes.POINTER(wintypes.POINT)]
+_user32.GetCursorPos.restype = wintypes.BOOL
+_WindowFromPoint.argtypes = [wintypes.POINT]
+_WindowFromPoint.restype = wintypes.HWND
+_PostMessage.argtypes = [
+    wintypes.HWND,
+    wintypes.UINT,
+    wintypes.WPARAM,
+    wintypes.LPARAM,
+]
+_PostMessage.restype = wintypes.BOOL
+WM_MOUSEWHEEL = 0x020A
+WM_MOUSEHWHEEL = 0x020E
+MK_CONTROL = 0x0008
+MK_SHIFT = 0x0004
 
 # ── Enumerations ──
 class ToolMode:
@@ -1090,6 +1108,67 @@ class OverlayWindow(QMainWindow):
         ex_style = _GetWindowLong(hwnd, GWL_EXSTYLE)
         flags = (ex_style | WS_EX_TRANSPARENT | WS_EX_LAYERED) if enabled else (ex_style & ~WS_EX_TRANSPARENT)
         _SetWindowLong(hwnd, GWL_EXSTYLE, flags)
+
+    def _forward_wheel_to_underlying(self, delta_x, delta_y, modifiers):
+        if not delta_x and not delta_y:
+            return False
+
+        cursor = wintypes.POINT()
+        if not _user32.GetCursorPos(ctypes.byref(cursor)):
+            return False
+
+        own_hwnd = int(self.winId())
+        was_click_through = self.is_click_through
+        if not was_click_through:
+            self.set_click_through(True)
+        try:
+            target_hwnd = int(_WindowFromPoint(cursor))
+        finally:
+            if not was_click_through:
+                self.set_click_through(False)
+
+        if not target_hwnd or target_hwnd == own_hwnd:
+            return False
+
+        key_state = 0
+        if modifiers & Qt.KeyboardModifier.ControlModifier:
+            key_state |= MK_CONTROL
+        if modifiers & Qt.KeyboardModifier.ShiftModifier:
+            key_state |= MK_SHIFT
+        screen_point = (cursor.y << 16) | (cursor.x & 0xFFFF)
+
+        posted = []
+        if delta_y:
+            wheel_data = (key_state & 0xFFFF) | ((int(delta_y) & 0xFFFF) << 16)
+            posted.append(_PostMessage(target_hwnd, WM_MOUSEWHEEL, wheel_data, screen_point))
+        if delta_x:
+            wheel_data = (key_state & 0xFFFF) | ((int(delta_x) & 0xFFFF) << 16)
+            posted.append(_PostMessage(target_hwnd, WM_MOUSEHWHEEL, wheel_data, screen_point))
+        return bool(posted) and all(posted)
+
+    def wheelEvent(self, event):
+        drawing_modes = (
+            ToolMode.PEN,
+            ToolMode.HIGHLIGHTER,
+            ToolMode.ERASER,
+            ToolMode.SHAPE,
+            ToolMode.SELECT,
+        )
+        if (
+            self.mode in drawing_modes
+            and not (event.buttons() & Qt.MouseButton.LeftButton)
+            and event.modifiers() & (
+                Qt.KeyboardModifier.ControlModifier
+                | Qt.KeyboardModifier.AltModifier
+            )
+        ):
+            delta = event.angleDelta()
+            if self._forward_wheel_to_underlying(
+                delta.x(), delta.y(), event.modifiers()
+            ):
+                event.accept()
+                return
+        event.ignore()
 
     # ── Pen helpers ──
 

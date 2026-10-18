@@ -125,6 +125,7 @@ Get up and running in under 30 seconds:
 | `Ctrl` + `P` | Toggle **Color Palette** |
 | `Ctrl` + `B` | Cycle **Whiteboard / Blackboard / Transparent Mode** |
 | `Ctrl` + `Q` | **Exit Application** |
+| `Ctrl` + mouse wheel | Scroll the underlying app while a drawing tool is active; drawing takes priority while the left button is held |
 | `Delete` / `Backspace` | Delete selected shape or stroke (in Selection Mode) |
 | `Shift` + `Draw` | Constrain to 1:1 aspect ratio (Square/Circle) or 45° line angle |
 | **Long-Press Tool** | Opens instant quick-size radial selector |

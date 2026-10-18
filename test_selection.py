@@ -127,6 +127,44 @@ class SelectionTests(unittest.TestCase):
         )
         self.window.mouseReleaseEvent(release)
 
+    def test_wheel_scroll_requires_modifier_and_not_active_drawing(self):
+        self.window.mode = main.ToolMode.PEN
+        forwarded = []
+        self.window._forward_wheel_to_underlying = lambda *args: forwarded.append(args) or True
+
+        class WheelEvent:
+            def __init__(self, modifiers, buttons=Qt.MouseButton.NoButton):
+                self._modifiers = modifiers
+                self._buttons = buttons
+
+            def modifiers(self):
+                return self._modifiers
+
+            def buttons(self):
+                return self._buttons
+
+            def angleDelta(self):
+                return QPointF(0, 120)
+
+            def accept(self):
+                pass
+
+            def ignore(self):
+                pass
+
+        self.window.wheelEvent(WheelEvent(Qt.KeyboardModifier.ControlModifier))
+        self.assertEqual(len(forwarded), 1)
+
+        forwarded.clear()
+        self.window.wheelEvent(WheelEvent(Qt.KeyboardModifier.NoModifier))
+        self.assertEqual(forwarded, [])
+
+        self.window.wheelEvent(WheelEvent(
+            Qt.KeyboardModifier.ControlModifier,
+            Qt.MouseButton.LeftButton,
+        ))
+        self.assertEqual(forwarded, [])
+
 
 if __name__ == "__main__":
     unittest.main()
