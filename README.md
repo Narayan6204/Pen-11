@@ -181,16 +181,19 @@ Pen 11 is ultra-lightweight, consuming almost **0% CPU when idle** and **less th
 git clone https://github.com/Narayan6204/Pen-11.git
 cd "Pen-11"
 
-# 2. Install dependencies
-pip install -r requirements.txt
+# 2. Create the virtual environment
+py -3 -m venv venv
 
-# 3. Run the app
-python main.py
+# 3. Install dependencies
+venv\Scripts\python.exe -m pip install -r requirements.txt
+
+# 4. Run the app
+venv\Scripts\python.exe main.py
 ```
 
 ### Compiling Standalone Executable
 ```bash
-python -m PyInstaller "Pen 11.spec" --noconfirm
+venv\Scripts\python.exe -m PyInstaller "Pen 11.spec" --noconfirm
 ```
 *The compiled binary will be placed directly in the `dist/` directory as `Pen 11.exe`.*
 

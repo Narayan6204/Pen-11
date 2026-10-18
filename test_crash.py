@@ -27,13 +27,13 @@ window.paths.append({'path': path, 'pen': QPen(), 'mode': main.ToolMode.PEN})
 window.selected_path_indices = [0]
 window._recalculate_master_obb()
 window.mode = main.ToolMode.SELECT
+failures = []
 
 # Select mode, simulate click on rotate handle
 # First calculate rot_handle
-rot_center, del_center, scale_center = window._get_selection_handles(window.paths[0].get('obb', main.QPolygonF(path.boundingRect())))
+rot_center, del_center = window._get_selection_handles(window.paths[0].get('obb', main.QPolygonF(path.boundingRect())))
 print("rot_center:", rot_center)
 print("del_center:", del_center)
-print("scale_center:", scale_center)
 
 event = QMouseEvent(QMouseEvent.Type.MouseButtonPress, rot_center, Qt.MouseButton.LeftButton, Qt.MouseButton.LeftButton, Qt.KeyboardModifier.NoModifier)
 try:
@@ -42,6 +42,7 @@ try:
 except Exception as e:
     import traceback
     traceback.print_exc()
+    failures.append(("Mouse press", e))
 
 # Simulate move
 try:
@@ -51,17 +52,19 @@ try:
 except Exception as e:
     import traceback
     traceback.print_exc()
+    failures.append(("Mouse move", e))
 
-# Simulate paint event to see if it crashes there
+# Exercise Qt's real paint lifecycle instead of calling paintEvent directly.
 try:
-    from PyQt6.QtGui import QPaintEvent
-    from PyQt6.QtCore import QRect
-    paint_event = QPaintEvent(QRect(0,0,100,100))
-    window.paintEvent(paint_event)
+    window.show()
+    app.processEvents()
+    window.repaint()
+    app.processEvents()
     print("Paint passed")
 except Exception as e:
     import traceback
     traceback.print_exc()
+    failures.append(("Paint", e))
 
 # Simulate delete handle
 event2 = QMouseEvent(QMouseEvent.Type.MouseButtonPress, del_center, Qt.MouseButton.LeftButton, Qt.MouseButton.LeftButton, Qt.KeyboardModifier.NoModifier)
@@ -71,5 +74,11 @@ try:
 except Exception as e:
     import traceback
     traceback.print_exc()
+    failures.append(("Mouse press 2", e))
 
+window.close()
+app.quit()
+if failures:
+    print(f"{len(failures)} smoke test step(s) failed")
+    sys.exit(1)
 sys.exit(0)

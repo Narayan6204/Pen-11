@@ -1,5 +1,5 @@
 ﻿# Code Index — Pen 11
-> Last Updated: 2026-08-21
+> Last Updated: 2026-10-18
 
 ---
 
@@ -40,9 +40,13 @@
 | `_build_shape_path()` | L678 | Geometric paths with Shift-key snap (aspect ratio + 45deg) |
 | `_draw_stroke()` | L744 | Render vector stroke with pen/highlighter settings |
 | `_recalculate_master_obb()` | L757 | Oriented bounding box for selected paths |
-| `_get_selection_handles()` | L776 | Rotation/delete/scale handle positions with collision avoidance |
+| `_get_selection_handles()` | L776 | Rotation/delete handle positions; resizing uses OBB corners and sides |
 | `_erase_between()` | L1113 | Sweep eraser, remove intersected strokes |
 | `_detect_shape()` | L1155 | Auto-convert rough strokes to clean circles/lines |
+| `_path_fully_contained()` | L1343 | Deterministic visible-ink containment test for lasso selection |
+| `_capture_selection_states()` | L1370 | Snapshot selection geometry, points, width, and color for undo |
+| `_record_selection_transform()` | L1393 | Record one completed move/rotate/scale gesture as undo |
+| `_begin_selection_scale()` | L1420 | Start corner or side resize with opposite anchor |
 
 ### Key Methods in ToolbarWindow (L1402)
 
@@ -50,6 +54,15 @@
 |--------|-------------|---------|
 | `start_collapse()` | L1670 | Animate toolbar -> compact pill (cubic bezier) |
 | `start_expand()` | L1702 | Animate pill -> full toolbar (cubic bezier) |
+
+## test_selection.py — Selection Regression Tests
+
+**Purpose**: Focused offscreen tests for visible-ink lasso containment, recolor undo, one-gesture transform undo, and resize-handle anchoring.
+
+| Test | Purpose |
+|------|---------|
+| `SelectionGeometryTests` | Verifies selection geometry and resize initialization |
+| `SelectionUndoTests` | Verifies recolor and transform undo restoration |
 
 ### Key Functions in MainAppCoordinator (L1864)
 

@@ -2,6 +2,117 @@
 
 ---
 
+## Session - 2026-10-18 16:57 IST (Windows Patch Build)
+
+### What Was Done
+- Built the portable Windows executable from the current working tree with PyInstaller 6.22.2.
+- Verified `dist\Pen 11.exe` was created as a windowed x64 executable with version metadata `2.0.0.0`.
+- Ran five focused selection tests, the Qt smoke test, Python compilation checks, and `git diff --check`.
+- Hardened `test_crash.py` so failures return a non-zero exit code instead of producing false-green validation.
+
+### Key Decisions Made
+- Keep generated `dist\` artifacts out of the source commit because the repository ignores build outputs; publish the source patch and report the verified local executable artifact separately.
+
+### Problems Found / Known Issues
+- The executable was built and validated locally, but clean-machine and physical tablet validation remain outside this environment.
+
+### Confidence Level
+- HIGH - PyInstaller completed successfully, the executable metadata and SHA-256 were inspected, and all release validation checks passed.
+
+### Next Steps
+- Commit and push the current source, tests, documentation, and memory updates as the new GitHub patch.
+
+## Session - 2026-10-18 16:05 IST (Selection Resize Refinement)
+
+### What Was Done
+- Removed the separate external resize button from the selection overlay.
+- Preserved resizing from all four corners and four side borders.
+- Fixed selection scaling to transform stroke geometry without changing pen width, preventing strokes from becoming bold after shrinking and enlarging.
+- Updated the Qt smoke test and code index for the two-handle selection overlay.
+
+### Key Decisions Made
+- Keep stroke width independent from selection geometry scaling so repeated resize operations do not compound visual weight.
+
+### Problems Found / Known Issues
+- Physical tablet and mixed-DPI manual verification remain unavailable.
+
+### Confidence Level
+- HIGH - The root cause was identified in the scale path and the existing automated selection coverage remains applicable.
+
+### Next Steps
+- Run the focused selection tests and Qt smoke test after this refinement.
+
+## Session - 2026-10-18 12:30 IST (Xournal++ Selection Implementation)
+
+### What Was Done
+- Implemented Xournal++-inspired selection improvements in `main.py`: visible-ink lasso containment, Shift-additive selection, 15-degree rotation snapping, Shift-uniform scaling, and corner/side resize handles.
+- Added one-gesture undo transactions for selection move, rotate, scale, and recolor operations using identity-based snapshots.
+- Added `test_selection.py` regression coverage for lasso containment, recolor undo, transform undo, and resize-handle anchoring.
+- Updated the README and project memory to document the selection behavior.
+- Ran the focused selection suite and the existing Qt smoke test in the project virtual environment; both passed.
+
+### Key Decisions Made
+- Keep selection transforms live during pointer movement but commit exactly one undo action on gesture completion.
+- Use visible stroked geometry for lasso containment rather than a sampled bounding-box coverage approximation.
+- Limit snapping to rotation and uniform scaling because Pen 11 has no grid model to support translation snapping safely.
+
+### Problems Found / Known Issues
+- Full interactive verification on physical tablets, multiple monitors, and mixed DPI configurations remains unperformed.
+- Broader event-driven assertions for cancellation and complete transform results would improve future coverage.
+
+### Confidence Level
+- HIGH - Focused regression tests, the existing crash smoke test, and an independent code review all passed; manual hardware and multi-monitor verification remains.
+
+### Next Steps
+- Perform manual tablet and multi-monitor/DPI checks when those environments are available.
+- Add event-driven cancellation and transform-result tests if selection behavior is extended further.
+
+## Session - 2026-10-18 12:06 IST (Xournal++ Selection Investigation)
+
+### What Was Done
+- Investigated official Xournal++ selection source and guide using the official `xournalpp/xournalpp` repositories; source download was attempted but the full shallow clone failed due to a network reset, so targeted GitHub file retrieval was used instead.
+- Reviewed Xournal++ `Selector`, `EditSelection`, `EditSelectionContents`, snapping, handle hit-testing, containment, transform, and undo patterns.
+- Audited Pen 11 selection in `main.py` and `test_crash.py`, including lasso selection, OBB handles, transforms, cache exclusion, tablet lifecycle, and undo history.
+- Collected independent research and adversarial audit reports; no application code was changed.
+
+### Key Decisions Made
+- Treat Xournal++ source/docs as the primary behavioral evidence; REA/native providers are not required because the target behavior is established by available official source.
+- Prioritize transform and recolor undo transactions, geometric containment semantics, modifier behavior, and assertion-based selection tests before cosmetic handle changes.
+
+### Problems Found / Known Issues
+- Pen 11 currently mutates selection transforms during pointer movement but does not record drag/rotate/scale undo actions.
+- Selected recoloring is not recorded in undo history.
+- Existing selection smoke coverage does not assert transform results, lasso semantics, cancellation, DPI/multi-monitor behavior, or tablet selection lifecycle.
+- Pen 11 lasso selection uses sampled coverage over a stroked bounding rectangle, which differs from Xournal++'s complete element-containment model.
+
+### Confidence Level
+- HIGH - Findings are grounded in official Xournal++ source/docs and direct Pen 11 source inspection; runtime behavior was not claimed where it was not observed.
+
+### Next Steps
+- Review and approve a surgical implementation scope, starting with transform/recolor undo and deterministic selection tests.
+- Then decide whether to add Shift-additive selection, explicit side handles, snapping, or geometry-based lasso containment.
+
+## Session - 2026-10-18 12:05 IST (REA Installation)
+
+### What Was Done
+- Installed Node.js 22.23.2 and npm using the official OpenJS Windows package.
+- Installed the official `rea-agents` npm package globally; verified REA CLI version 6.5.0.
+- Registered REA's local MCP server for VS Code in `%APPDATA%\Code\User\mcp.json`.
+- Ran REA diagnostics; Node.js, Windows host support, bundled skill version 42, and the VS Code registration are aligned.
+
+### Key Decisions Made
+- Installed the core REA CLI and VS Code integration only; native engines such as Ghidra, IDA, Hopper, and JADX remain optional target-specific providers.
+
+### Problems Found / Known Issues
+- An audit-wide `rea doctor` reports missing optional native-analysis providers and stale registrations for other detected clients; the VS Code registration itself is healthy.
+
+### Confidence Level
+- HIGH - CLI help, version, MCP configuration, and REA diagnostics were verified.
+
+### Next Steps
+- Restart VS Code so it loads the new REA MCP server.
+- Install and configure Ghidra/JDK or another provider only when native binary or Android analysis is needed.
+
 ## Session - 2026-09-11 16:15 IST (Adversarial Mobile & Tablet QA Audit & Resolution)
 
 ### What Was Done

@@ -1,6 +1,31 @@
 ﻿# Architecture Decisions — Pen 11
 > Add new entries at the TOP. Newest first.
 
+## Decision — 2026-10-18: Preserve Stroke Width During Selection Resize
+
+**Context**: Repeatedly shrinking and enlarging a selected stroke caused its pen width to change and produce visually bold results.
+
+**Choice**: Selection resize transforms the stroke path and pressure points but leaves the stored pen width unchanged.
+
+**Alternatives Considered**:
+- Scale pen width with the average geometric scale
+- Recompute width from the current transformed bounding box
+
+**Rationale**: Pen width is an intentional drawing property, not selection UI state. Keeping it stable prevents cumulative visual thickening and makes repeated resize operations predictable.
+
+## Decision — 2026-10-18: Geometry-Based Selection Transactions
+
+**Context**: Xournal++ selection behavior exposed gaps in Pen 11's lasso semantics, modifier behavior, resize handles, and undo history.
+
+**Choice**: Select strokes based on sampled visible stroked geometry, capture identity-based pre-gesture snapshots, and commit one undo action when a move, rotation, scale, or recolor gesture completes. Add Shift modifiers for additive selection, rotation snapping, and uniform scaling.
+
+**Alternatives Considered**:
+- Continue using bounding-box coverage for lasso selection
+- Record every pointer-move mutation as a separate undo entry
+- Add translation grid snapping without an existing Pen 11 grid model
+
+**Rationale**: Visible-ink containment matches the intended complete-element selection semantics, identity snapshots survive index shifts, gesture-level undo preserves a usable history, and unsupported grid behavior was intentionally not invented.
+
 ---
 
 ## Decision — 2026-08-21: Persistent Memory via Markdown Files

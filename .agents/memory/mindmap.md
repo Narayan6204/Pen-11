@@ -1,5 +1,5 @@
 # Pen 11 — Project Mind Map
-> Last Updated: 2026-09-09
+> Last Updated: 2026-09-21
 
 ---
 
@@ -15,9 +15,11 @@ A companion Material Design 3 web landing page & interactive canvas demo (hosted
 
 ```
 Pen 11/
-+-- main.py              Core app: overlay window, toolbar, drawing engine (~106 KB, ~2308 lines)
-+-- storage.py           Settings persistence -> %APPDATA%/Pen11/settings.json (2.6 KB)
++-- main.py              Core app: overlay window, toolbar, drawing engine (~133 KB, 2952 lines)
++-- storage.py           Validated settings persistence -> %APPDATA%/Pen11/settings.json (100 lines)
 +-- process_manager.py   Single-instance IPC guard via QLocalServer (2.3 KB)
++-- requirements.txt     Runtime/build dependencies for PyQt6, keyboard, and PyInstaller
++-- run.bat               Windows launcher pinned to venv\Scripts\python.exe
 +-- serve.js             Zero-dep Node.js local dev server for web/ preview (1.5 KB)
 +-- test_crash.py        Headless unit test for vector selection & rotation (2 KB)
 +-- web/
@@ -95,12 +97,12 @@ web/js/app.js
 | `CustomHoverMenu` | main.py | L391 | Grid action popup, uses `_smart_position` for screen-safe placement |
 | `FloatingShapeToolbox` | main.py | L440 | Shape selector floating palette |
 | `DragHandle` | main.py | L530 | Drag widget, emits position deltas |
-| `OverlayWindow` | main.py | L575 | **CORE**: fullscreen transparent QMainWindow — vector render, mouse events, tablet events, lasso, transform |
-| `FloatingColorPalette` | main.py | L1553 | 12-swatch color picker, active glow |
-| `ToolbarWindow` | main.py | L1635 | **CORE**: floating toolbar, collapsible pill animation |
-| `AppSystemTray` | main.py | L2038 | System tray icon + context menu |
-| `MainAppCoordinator` | main.py | L2070 | **CORE**: master coordinator, settings restore, hotkeys, `_clamp_to_screen (pill handle only)` |
-| `SettingsManager` | storage.py | L22 | JSON persistence in %APPDATA%/Pen11/settings.json (atomic write via .tmp) |
+| `OverlayWindow` | main.py | L764 | **CORE**: fullscreen transparent QMainWindow — vector render, mouse events, tablet events, lasso, transform |
+| `FloatingColorPalette` | main.py | L2093 | 12-swatch color picker, active glow |
+| `ToolbarWindow` | main.py | L2172 | **CORE**: floating toolbar, collapsible pill animation |
+| `AppSystemTray` | main.py | L2626 | System tray icon + context menu |
+| `MainAppCoordinator` | main.py | L2680 | **CORE**: master coordinator, settings restore, hotkeys, `_clamp_to_screen` |
+| `SettingsManager` | storage.py | L22 | JSON persistence with per-field validation and atomic `.tmp` replacement |
 | `SingleInstanceGuard` | process_manager.py | L14 | IPC pipe to prevent duplicate instances |
 
 ### Web App (JavaScript ES6)
@@ -130,12 +132,21 @@ web/js/app.js
 7. **Canvas Modes**: Transparent overlay, Whiteboard, Blackboard
 8. **Ink Toggle & Click-Through**: Ctrl+5, Win32 WS_EX_TRANSPARENT
 9. **Performance**: D3D11 backend, Per-Monitor DPI, HIGH_PRIORITY_CLASS, GC throttling, 1ms timer (winmm)
-10. **Persistence**: JSON settings in %APPDATA%/Pen11/, single-instance IPC, atomic write (crash-safe)
+10. **Persistence**: JSON settings in %APPDATA%/Pen11/, per-field validation, debounced writes, toolbar/floating-panel positions, single-instance IPC, atomic write (crash-safe)
 11. **Web Companion**: M3 landing page + live HTML5 canvas demo + GitHub release telemetry
 12. **Fade Tooltips**: All buttons use FadeTooltip singleton (no blinking, smooth fade in/out, race-condition safe)
 13. **PEN-ONLY Cursor Hide**: Cursor hidden ONLY during active Pen drawing — NOT Highlighter/Eraser
 14. **Pen Tablet Support**: `tabletEvent()` on OverlayWindow — pressure-sensitive variable-width strokes per segment, eraser-end auto-switch, mouse fallback at pressure=1.0
 15. **Windows 11 Optimizations**: SetProcessDpiAwareness, D3D11 backend, HIGH_PRIORITY_CLASS, winmm 1ms timer
+16. **Action-Based Undo**: Normal strokes, indexed selection deletion, grouped eraser gestures, clear operations, and selection move/rotate/scale/recolor restore exact state.
+17. **Xournal++-Inspired Selection**: Visible-ink lasso containment, Shift-additive selection, 15-degree rotation snapping, Shift-uniform scaling, corner/side resize handles, fixed-width stroke scaling, and one undo action per completed gesture. Rotation/delete are the only external handles.
+18. **Selection Regression Tests**: `test_selection.py` covers containment, recolor undo, transform undo, and resize-handle anchoring in offscreen Qt.
+19. **Deterministic Launch**: `run.bat` changes to the project root and invokes the project virtual environment explicitly; README build/run commands use the same interpreter.
+20. **Stable Stroke Widths**: Each stroke snapshots its `QPen` at press time, so active strokes are unaffected by later size changes; cancellation paths reset the snapshot and tablet pressure.
+21. **Input and Test Hardening**: Tablet eraser detection uses the PyQt enum name with compatibility fallback; standalone stability regressions cover settings, widths, and undo.
+22. **Cursor Rendering Cache**: Cursor pixmaps are cached by tool, size, and color to avoid rebuilding identical cursors during repeated UI updates.
+23. **Cursor Mode Visual State**: Main toolbar buttons and cursor submenu buttons dim to 68% opacity while cursor mode is active; palette swatches use a muted blended color that preserves their selection glow. All controls restore on tool change.
+24. **Visibility Fade Reset**: Cursor-mode dimming requires visible ink and is cleared immediately when the canvas is hidden.
 
 ---
 
@@ -143,13 +154,11 @@ web/js/app.js
 
 | Area | Risk | Location |
 |------|------|----------|
-| Windows-only ctypes calls | App crashes on non-Windows without guards | main.py `set_click_through()` ~L655 |
 | Global `keyboard` hooks | Keys stay suppressed if exception before `unhook_all()` | main.py `setup_global_shortcuts()` ~L2160 |
-| GC manually disabled during drawing | If mouseRelease dropped (e.g. Alt+Tab), GC stays off forever | main.py `mousePressEvent`/`mouseReleaseEvent` |
 | Tablet pointer type int check | `event.pointerType() == 3` — integer comparison, not enum; may break in future PyQt6 | main.py `tabletEvent()` ~L987 |
 | Pressure variable-width rendering | Per-segment draw is O(N) — very long pressure-varied strokes may slow paintEvent | main.py `_draw_stroke()` ~L888 |
-| has_been_dragged flag never saved | User-dragged panel positions reset on every app restart | FloatingPanel, MainAppCoordinator |
-| Selection index invalidation | Async stroke change during multi-delete → OOB index | main.py `_recalculate_master_obb()` ~L930 |
+| Web validation tooling | Web JavaScript syntax checks require Node.js, which is not part of the current environment | `web/js/` |
+| Dependency isolation | Current machine uses a local `.pth` bridge to global PyQt6; fresh environments should install `requirements.txt` directly | `venv/Lib/site-packages/pen11_global_site.pth` |
 
 ---
 
@@ -169,6 +178,18 @@ web/js/app.js
 - All popups now use `FloatingPanel._smart_position()` — screen-edge aware, multi-monitor safe (commit `1e39d44`)
 - Pen tablet support added: pressure-sensitive strokes, eraser-end flip, mouse fallback (commit `21f20b3`)
 - v2.0.0 audit: 9 bugs fixed (commit `6da76bf`)
-- App is stable and fully working
-- Memory files were stashed in git — RECOVERED and updated now
+- Confirmed and fixed: destructive desktop edits now use exact action-based undo.
+- Confirmed and fixed: persisted settings are sanitized per field, including invalid encoding handling.
+- Added `requirements.txt` for the documented source/build workflow.
+- Hardened `run.bat` and the README to use the project virtual environment explicitly.
+- Hardened resource lookup by making `run.bat` set the project root as its working directory.
+- Fixed size-switch rendering: active strokes retain their starting width, while subsequent strokes use the newly selected size.
+- Added persistence for detached palette and shape-toolbox positions, debounced settings writes, tablet enum compatibility, and a Windows font fallback.
+- Fixed repeated cursor-mode crash caused by reusing deleted palette opacity effects; palette muting now uses color blending instead of competing graphics effects.
+- Added `scratch/test_stability.py` covering settings fallback, stroke-width snapshots, and indexed-delete undo.
+- Optimized repeated cursor updates and changed `test_crash.py` to exercise Qt's real paint lifecycle without inactive-painter warnings.
+- Sanitized all floating-panel coordinates, clamped restored panels to usable screen bounds, and reset interrupted tablet state on focus/window loss.
+- Added reversible cursor-mode dimming for the main toolbar and cursor submenu, with regression coverage.
+- Repaired the NUL byte in `scratch/scaffold_ad_skill.py`; the application Python compile sweep passes.
+- Existing PyQt selection smoke test and focused history scenarios pass in offscreen mode.
 - **Next session MUST read this file first before any code work**
