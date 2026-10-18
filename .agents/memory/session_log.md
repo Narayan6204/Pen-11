@@ -22,6 +22,26 @@
 ### Next Steps
 - Commit and push the current source, tests, documentation, and memory updates as the new GitHub patch.
 
+## Session - 2026-10-18 17:12 IST (Post-Release Stability Cleanup)
+
+### What Was Done
+- Removed the obsolete shape-detection timer now that detection occurs only on release.
+- Removed unused selection resize state and comparison helper.
+- Finalized active eraser undo state when focus or window visibility is lost.
+- Re-enabled and collected Python GC on the shape-tap early-release path.
+
+### Key Decisions Made
+- Limited cleanup to proven-dead state and lifecycle fixes; did not change pressure rendering or eraser cache behavior without profiling evidence.
+
+### Problems Found / Known Issues
+- Clean-machine executable launch and physical tablet testing remain unavailable.
+
+### Confidence Level
+- HIGH - Changes are localized, preserve the existing input model, and are covered by the release test suite after rebuild.
+
+### Next Steps
+- Rebuild the executable, rerun validation, and push this follow-up cleanup commit.
+
 ## Session - 2026-10-18 16:05 IST (Selection Resize Refinement)
 
 ### What Was Done

@@ -808,11 +808,6 @@ class OverlayWindow(QMainWindow):
         self._pre_eraser_mode = None    # Tool mode before eraser-end auto-switch
         self._cursor_cache = {}
 
-        # Shape detection timer
-        self.shape_timer = QTimer(self)
-        self.shape_timer.setSingleShot(True)
-        self.shape_timer.timeout.connect(self._detect_shape)
-
         # Select state
         self.selected_path_indices = []
         self.master_obb = None
@@ -826,7 +821,6 @@ class OverlayWindow(QMainWindow):
         self.selection_rotation_start_angle = 0
         self.selection_start_states = []
         self.selection_resize_pending = False
-        self.selection_active_handle_pos = None
         self.selection_scale_handle = 2
         self.selection_additive = False
 
@@ -899,7 +893,6 @@ class OverlayWindow(QMainWindow):
         self.selection_start_states.clear()
         self.selection_start_master_obb = None
         self.selection_resize_pending = False
-        self.selection_active_handle_pos = None
         self.selection_scale_handle = 2
         self.is_lassoing = False
         self.lasso_path = None
@@ -997,8 +990,6 @@ class OverlayWindow(QMainWindow):
         # Safety: re-enable GC if a mid-stroke keyboard shortcut bypassed mouseReleaseEvent
         if not gc.isenabled():
             gc.enable()
-        # Safety: stop shape detection timer so _detect_shape can't fire on stale path
-        self.shape_timer.stop()
         self.drawing = False
         self.raw_points = []
         self.raw_pressures = []
@@ -1078,8 +1069,6 @@ class OverlayWindow(QMainWindow):
         self.current_pen = None
         self.raw_points = []
         self.raw_pressures = []
-        self.shape_timer.stop()
-
         self.ink_visible = not self.ink_visible
         if not self.ink_visible:
             self._cancel_selection_interaction()
@@ -1371,18 +1360,6 @@ class OverlayWindow(QMainWindow):
                 })
         return states
 
-    @staticmethod
-    def _selection_state_changed(before, after):
-        if before['path'] != after['path'] or before['obb'] != after['obb']:
-            return True
-        if before.get('pen_width') != after.get('pen_width'):
-            return True
-        if before.get('pen_color') != after.get('pen_color'):
-            return True
-        before_points = before.get('points')
-        after_points = after.get('points')
-        return before_points != after_points
-
     def _record_selection_transform(self):
         if not self.selection_start_states:
             return
@@ -1409,7 +1386,6 @@ class OverlayWindow(QMainWindow):
         self.selection_action = 'scale'
         self.selection_scale_handle = corner_index
         self.selection_start_pos = event.position()
-        self.selection_active_handle_pos = event.position()
         self.selection_start_master_obb = QPolygonF(self.master_obb)
         self.selection_start_states = self._capture_selection_states(
             self.selected_path_indices
@@ -1420,10 +1396,6 @@ class OverlayWindow(QMainWindow):
         )
         self.selection_start_center = center
         self.selection_resize_pending = True
-        content_rect = QRectF()
-        for state in self.selection_start_states:
-            content_rect = content_rect.united(state['path'].boundingRect())
-        self.selection_start_max_dim = max(content_rect.width(), content_rect.height())
         self._rebake_cache(exclude_indices=self.selected_path_indices)
         event.accept()
 
@@ -1556,6 +1528,7 @@ class OverlayWindow(QMainWindow):
 
     def focusOutEvent(self, event):
         """Re-enable GC if focus is lost mid-stroke (e.g. Alt+Tab)."""
+        self._finish_erase_action()
         if not gc.isenabled():
             gc.enable()
         self.drawing = False
@@ -1567,6 +1540,7 @@ class OverlayWindow(QMainWindow):
 
     def hideEvent(self, event):
         """Re-enable GC if window is hidden mid-stroke."""
+        self._finish_erase_action()
         if not gc.isenabled():
             gc.enable()
         self.drawing = False
@@ -1778,7 +1752,6 @@ class OverlayWindow(QMainWindow):
                     self.master_obb = transform.map(self.selection_start_master_obb)
                     self.update()
                 elif self.selection_action == 'scale' and self.selected_path_indices:
-                    self.selection_active_handle_pos = event.position()
                     if self.selection_resize_pending:
                         if math.hypot(
                             event.position().x() - self.selection_start_pos.x(),
@@ -1925,7 +1898,6 @@ class OverlayWindow(QMainWindow):
                     self._rebake_cache(exclude_indices=self.selected_path_indices)
                 self.selection_action = None
                 self.selection_resize_pending = False
-                self.selection_active_handle_pos = None
                 self.selection_scale_handle = 2
                 self.selection_start_states.clear()
                 return
@@ -1937,14 +1909,18 @@ class OverlayWindow(QMainWindow):
                 if not gc.isenabled():
                     gc.enable()
 
-            self.shape_timer.stop()
             while QApplication.overrideCursor() is not None:
                 QApplication.restoreOverrideCursor()
             self._update_cursor()
             if self.drawing and self.current_path:
                 if self.mode == ToolMode.SHAPE and (self.current_path.isEmpty() or self.current_path.elementCount() <= 1):
                     self.current_path = None
+                    self.current_pen = None
+                    self.raw_points = []
+                    self.raw_pressures = []
                     self.drawing = False
+                    gc.enable()
+                    gc.collect(0)
                     self.update()
                     return
 
@@ -2258,7 +2234,6 @@ class OverlayWindow(QMainWindow):
 
     def clear_screen(self):
         self._finish_erase_action()
-        self.shape_timer.stop()          # cancel any pending shape detection
         if not gc.isenabled():
             gc.enable()
         self._cancel_selection_interaction()

@@ -116,7 +116,6 @@ class SelectionTests(unittest.TestCase):
         self.window.mouseMoveEvent(move)
 
         self.assertTrue(self.window.drawing)
-        self.assertFalse(self.window.shape_timer.isActive())
         self.assertGreaterEqual(len(self.window.raw_points), 2)
 
         release = QMouseEvent(
