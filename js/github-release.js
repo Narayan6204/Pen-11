@@ -12,18 +12,18 @@ const CACHE_TTL_MS = 10 * 60 * 1000; // 10 minutes
 
 // Tier 4: Hardcoded Resilience Fallback (Guarantees UI never breaks offline or during rate-limits)
 const STATIC_FALLBACK = {
-  tagName: 'v2.0.0',
-  version: '2.0.0',
-  name: 'Pen 11 v2.0.0 (Direct3D 11 Hardware Inking Update)',
-  publishedAt: '2026-08-19T00:00:00Z',
+  tagName: 'v2.2.0',
+  version: '2.2.0',
+  name: 'Pen 11 v2.2.0 (Windows 11 Native Architecture & Input Refinement)',
+  publishedAt: '2026-10-21T00:00:00Z',
   downloadUrl: `https://github.com/${REPO_OWNER}/${REPO_NAME}/releases/latest`,
-  directDownloadUrl: `https://github.com/${REPO_OWNER}/${REPO_NAME}/releases/download/v2.0.0/Pen.11.exe`,
-  zipDownloadUrl: `https://github.com/${REPO_OWNER}/${REPO_NAME}/releases/download/v2.0.0/Pen-11-v2.0.0-Windows.zip`,
+  directDownloadUrl: `https://github.com/${REPO_OWNER}/${REPO_NAME}/releases/download/v2.2.0/Pen.11.exe`,
+  zipDownloadUrl: `https://github.com/${REPO_OWNER}/${REPO_NAME}/releases/download/v2.2.0/Pen-11-v2.2.0-Windows.zip`,
   assetName: 'Pen.11.exe',
   assetSize: 38649414,
   sizeFormatted: '38.6 MB',
   zipSizeFormatted: '38.3 MB',
-  body: 'High-performance screen annotation with Direct3D 11 hardware acceleration, Smart Objects, and Circle-to-Select Lasso.',
+  body: 'High-performance screen annotation for Windows 11 with native RegisterHotKey shortcuts, high-DPI system tray integration, and pure freehand tablet inking.',
   source: 'static_fallback'
 };
 
