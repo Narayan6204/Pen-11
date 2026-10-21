@@ -20,11 +20,17 @@ const STATIC_FALLBACK = {
   directDownloadUrl: `https://github.com/${REPO_OWNER}/${REPO_NAME}/releases/download/v2.2.0/Pen.11.exe`,
   zipDownloadUrl: `https://github.com/${REPO_OWNER}/${REPO_NAME}/releases/download/v2.2.0/Pen-11-v2.2.0-Windows.zip`,
   assetName: 'Pen.11.exe',
-  assetSize: 38649414,
-  sizeFormatted: '38.6 MB',
-  zipSizeFormatted: '38.3 MB',
+  assetSize: 30858921,
+  sizeFormatted: '30.8 MB',
+  zipSizeFormatted: '30.5 MB',
   body: 'High-performance screen annotation for Windows 11 with native RegisterHotKey shortcuts, high-DPI system tray integration, and pure freehand tablet inking.',
   source: 'static_fallback'
+};
+
+// Google Drive Fast Mirror Configuration
+export const GDRIVE_CONFIG = {
+  fileId: '', // Paste Google Drive File ID here for 1-click high-speed download
+  mirrorUrl: 'https://github.com/Narayan6204/Pen-11/releases/latest' // Default fallback to latest release
 };
 
 /**
@@ -33,7 +39,7 @@ const STATIC_FALLBACK = {
  * @returns {string}
  */
 export function formatBytes(bytes) {
-  if (!bytes || isNaN(bytes)) return '38.6 MB';
+  if (!bytes || isNaN(bytes)) return '30.8 MB';
   const units = ['B', 'KB', 'MB', 'GB'];
   let i = 0;
   let size = bytes;
@@ -159,6 +165,15 @@ export class GitHubReleaseManager {
     // Update .ZIP Download Links
     document.querySelectorAll('[data-gh-zip-url]').forEach(el => {
       el.setAttribute('href', release.zipDownloadUrl || release.downloadUrl);
+    });
+
+    // Update Google Drive Fast Mirror Links if configured
+    document.querySelectorAll('[data-gdrive-download-url]').forEach(el => {
+      if (GDRIVE_CONFIG.fileId) {
+        el.setAttribute('href', `https://drive.usercontent.google.com/download?id=${GDRIVE_CONFIG.fileId}&export=download`);
+      } else if (GDRIVE_CONFIG.mirrorUrl) {
+        el.setAttribute('href', GDRIVE_CONFIG.mirrorUrl);
+      }
     });
 
     // Update File Size Badges

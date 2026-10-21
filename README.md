@@ -175,7 +175,7 @@ Pen 11 is ultra-lightweight, consuming almost **0% CPU when idle** and **less th
 * **OS:** Windows 10 or Windows 11 (64-bit recommended)
 * **RAM:** 50 MB to 100 MB free memory
 * **Graphics:** Any GPU supporting DirectX 11 / Direct3D (Intel HD Graphics, AMD, NVIDIA)
-* **Storage:** 40 MB free disk space (Portable `.exe`)
+* **Storage:** 31 MB free disk space (Portable `.exe` — slim Direct3D 11 build)
 * **Display:** Supports all resolutions (720p, 1080p, 2K, 4K, Ultrawide) and high refresh rates (60Hz, 120Hz, 144Hz+)
 
 ---

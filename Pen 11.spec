@@ -9,10 +9,14 @@ a = Analysis(
     hookspath=[],
     hooksconfig={},
     runtime_hooks=[],
-    excludes=[],
+    excludes=['PyQt6.QtQml', 'PyQt6.QtQuick', 'PyQt6.QtQuick3D', 'PyQt6.QtPdf', 'PyQt6.QtMultimedia', 'PyQt6.QtBluetooth'],
     noarchive=False,
     optimize=0,
 )
+
+# Exclude legacy Mesa software-rendered OpenGL (20.6 MB) - Pen 11 uses native Windows 11 Direct3D 11 GPU pipeline
+a.binaries = [x for x in a.binaries if not x[0].lower().endswith('opengl32sw.dll')]
+
 pyz = PYZ(a.pure)
 
 exe = EXE(
