@@ -99,7 +99,7 @@ How does Pen 11 compare against traditional desktop screen markers?
 * **💻 Developers & Designers:**
   Highlight lines of code during pull request reviews, sketch architecture and data-flow diagrams during live pair programming, and circle bugs directly over running applications without stealing window focus. Group, rotate, and scale strokes with pure vector Oriented Bounding Box (OBB) selection.
 * **🎤 Business Presenters & Streamers:**
-  Guide audience focus during webinars and software demos using highlighters, auto-snapped arrows, and callouts. Collapse the toolbar to an unobtrusive pill (`Ctrl+5`) when recording clean screencasts or sharing screens on Zoom, Teams, and OBS.
+  Guide audience focus during webinars and software demos using highlighters, precision arrows, and callouts. Collapse the toolbar to an unobtrusive pill (`Ctrl+5`) when recording clean screencasts or sharing screens on Zoom, Teams, and OBS.
 
 ---
 
@@ -117,7 +117,7 @@ Get up and running in under 30 seconds:
 
 | Shortcut | Action |
 | :--- | :--- |
-| `Ctrl` + `1` | Select **Pen Tool** |
+| `Ctrl` + `1` | Select **Pen Tool** (100% pure freehand vector inking) |
 | `Ctrl` + `2` | Select **Highlighter Tool** |
 | `Ctrl` + `3` | Select **Eraser Tool** |
 | `Ctrl` + `4` | Select **Cursor / Selection Mode** (Lasso & Transform) |
@@ -133,7 +133,9 @@ Get up and running in under 30 seconds:
 | `Delete` / `Backspace` | Delete selected shape or stroke (in Selection Mode) |
 | `Shift` + `Draw` | Constrain to 1:1 aspect ratio (Square/Circle) or 45° line angle |
 | **Long-Press Tool** | Opens instant quick-size radial selector |
-| **Hold Pen 400ms** | Auto-snaps hand-drawn stroke into perfect geometric shape |
+| **Shapes Toolbox** | Draw Line, Arrow, Rectangle, Rounded Rect, Circle, Triangle |
+
+> 💡 **Intelligent Hotkey Scoping:** Inking shortcuts (`Ctrl+Z`, `Ctrl+P`, `Ctrl+B`, `Ctrl+]`, `Ctrl+[`) are automatically unhooked when the canvas is hidden (`Ctrl+5`) or when in Cursor Mode (`Ctrl+4`), so all your favorite shortcuts in VS Code, Word, Chrome, and Photoshop continue working seamlessly without conflict.
 
 ---
 
