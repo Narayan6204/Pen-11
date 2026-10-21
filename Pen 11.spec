@@ -4,7 +4,7 @@ a = Analysis(
     ['main.py'],
     pathex=[],
     binaries=[],
-    datas=[('app_icon.ico', '.')],
+    datas=[('app_icon.ico', '.'), ('app_icon.png', '.')],
     hiddenimports=['storage', 'process_manager', 'PyQt6', 'PyQt6.QtCore', 'PyQt6.QtGui', 'PyQt6.QtWidgets', 'PyQt6.QtNetwork'],
     hookspath=[],
     hooksconfig={},

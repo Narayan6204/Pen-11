@@ -4,8 +4,8 @@
 #
 VSVersionInfo(
   ffi=FixedFileInfo(
-    filevers=(2, 0, 0, 0),
-    prodvers=(2, 0, 0, 0),
+    filevers=(2, 2, 0, 0),
+    prodvers=(2, 2, 0, 0),
     mask=0x3f,
     flags=0x0,
     OS=0x40004,
@@ -21,12 +21,12 @@ VSVersionInfo(
           [
             StringStruct(u'CompanyName', u'Narayan Dev (Pen 11 Open Source)'),
             StringStruct(u'FileDescription', u'Pen 11 - High-Performance Screen Annotation for Windows 11'),
-            StringStruct(u'FileVersion', u'2.0.0.0'),
+            StringStruct(u'FileVersion', u'2.2.0.0'),
             StringStruct(u'InternalName', u'Pen 11'),
             StringStruct(u'LegalCopyright', u'Copyright (c) 2026 Narayan Dev. MIT Licensed.'),
             StringStruct(u'OriginalFilename', u'Pen 11.exe'),
             StringStruct(u'ProductName', u'Pen 11'),
-            StringStruct(u'ProductVersion', u'2.0.0.0'),
+            StringStruct(u'ProductVersion', u'2.2.0.0'),
             StringStruct(u'Comments', u'Clean, Direct3D 11 GPU-accelerated screen marker for Windows 11.')
           ]
         )

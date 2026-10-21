@@ -39,7 +39,7 @@ How does Pen 11 compare against traditional desktop screen markers?
 | **Pen Tablet & Stylus** | **Native pressure sensitivity & auto stylus eraser flip** (`tabletEvent()`) | Stylus pressure & advanced features locked behind Pro | Basic Wintab/stylus support, no automatic eraser flip |
 | **Rendering Engine** | **Two-Layer Backing Cache ($O(1)$ GPU blit)** — 50,000+ strokes at 60 FPS | $O(N)$ redraw loop; stutters under heavy drawing | GDI+ CPU redraw loop; noticeable lag on complex canvases |
 | **Vector Selection & Lasso**| **Oriented Bounding Box (OBB)**: drag, rotate, scale, and delete strokes | None in Free version; limited basic moves in Pro | None (bitmap-style clear/undo only) |
-| **Geometric Auto-Snap** | **Hold 400ms for instant geometric snapping** (lines, circles, ellipses) | Manual shapes locked behind paid Pro version | Rudimentary shapes, no gesture detection |
+| **Geometric Shapes** | **Dedicated Shapes Toolbox** (Line, Arrow, Rectangle, Rounded Rect, Circle, Triangle) with Shift-constrain | Manual shapes locked behind paid Pro version | Rudimentary shapes, no gesture detection |
 | **Edge & Taskbar Safety** | **Smart screen-edge detection (`_smart_position()`)** with auto-flip & multi-monitor support | Basic dock snapping; frequently occluded by taskbar | Fixed positioning; can overflow display edges |
 | **Memory & Resource Use**| **< 50 MB RAM**, ~0% idle CPU, Direct3D 11 GPU acceleration | 80–150 MB RAM, background helper services | ~40–60 MB RAM, software rasterized |
 | **Installation** | **100% Portable single `.exe`** (Zero registry clutter) | Windows installer (`.msi`/`.exe`) required | Portable zip |
@@ -80,7 +80,11 @@ How does Pen 11 compare against traditional desktop screen markers?
 
 ### 📐 Smart Objects & Pure Vector Selection
 * **Oriented Bounding Box (OBB) Engine:** Group, rotate, drag, and scale multiple strokes simultaneously with oriented bounding box physics.
-* **Gesture-Based Geometric Detection:** Draw any rough circle, oval, or line and hold your pen still for `400ms`—Pen 11 will automatically snap it into a mathematically perfect geometric shape.
+* **Dedicated Precision Shapes Suite:** Draw mathematically perfect Lines, Arrows, Rectangles, Rounded Rectangles, Circles, and Triangles via the dedicated floating shape toolbox with Shift-constrained aspect ratios.
+
+### ⌨️ Native Win32 Hotkeys & Windows 11 Shell Integration
+* **Zero Hooking Lag:** Uses native Win32 `RegisterHotKey` instead of low-level keyboard hooks (`WH_KEYBOARD_LL`). Zero CPU usage, no antivirus false-positives, and no timeout drops under heavy CPU load.
+* **Persistent System Tray Presence:** Explicit `AppUserModelID` registration and multi-resolution tray icons keep Pen 11 accessible in the Windows 11 notification area even when running in the background.
 
 ### 💾 Persistent State & Single-Instance Safety
 * **Zero-Loss Storage Manager:** Automatically saves your favorite pen widths, colors, shape selections, and toolbar coordinates to `%APPDATA%/Pen11/settings.json`.
