@@ -2,6 +2,28 @@
 
 ---
 
+## Session - 2026-10-21 20:15 IST (Windows 11 Native Architecture & Compositor Optimizations)
+
+### What Was Done
+- Created restore point tag `restore-point-pre-win11` and backup branch `backup-pre-win11`.
+- Replaced `keyboard` module with native Win32 `RegisterHotKey` / `WM_HOTKEY` via `Win32HotKeyManager(QAbstractNativeEventFilter)`, completely eliminating `WH_KEYBOARD_LL` low-level hook timeouts and antivirus/SmartScreen false positives.
+- Implemented dynamic hotkey scoping: drawing shortcuts (`Ctrl+Z`, `Ctrl+P`, `Ctrl+B`, `Ctrl+]`, `Ctrl+[`, `Ctrl+Shift+C`) are automatically unregistered when canvas is hidden or in Cursor mode, allowing underlying apps (VS Code, Excel, Chrome) to retain their shortcuts.
+- Added `os.environ["QT_WINTAB"] = "0"` to enforce native Windows Ink (`WM_POINTER`) on Windows 11 2-in-1s and styluses.
+- Set Win32 property `MicrosoftTabletPenServiceProperty` (`0x00010009`) on `OverlayWindow` to disable the 300ms press-and-hold right-click delay and flick heuristics.
+- Configured native Per-Monitor V2 DPI Awareness (`SetProcessDpiAwarenessContext(-4)`) and set process priority to `ABOVE_NORMAL_PRIORITY_CLASS` (0x00008000).
+- Disabled Windows 11 EcoQoS Power Throttling (`ProcessPowerThrottling = 4`) to prevent CPU scheduling to E-cores during active drawing.
+- Handled Windows 11 `Win + D` (Show Desktop) and Snap minimization in `changeEvent` and `hideEvent` with automatic asynchronous recovery.
+- Replaced fullscreen `self.update()` in `ToolMode.SELECT` (drag, rotate, scale, lasso) with minimal dirty bounding box updates.
+- Reduced freehand and shape drawing padding in `mouseMoveEvent` from 150px/100px down to 24px (`max(24.0, pen_width * 2.0)`), reducing DWM RAM-to-GPU raster copy area by over 80%.
+- Cached `stroke['hit_path']` on `mouseReleaseEvent` and selection transforms, eliminating continuous `QPainterPathStroker` recalculations in `_erase_between` and click hit-testing.
+- Fixed `FloatingColorPalette` re-docking: set `has_been_dragged = False` along with `is_detached = False` when `dist <= 35`.
+- Removed `keyboard` from `requirements.txt` and `Pen 11.spec`.
+
+### Confidence Level
+- HIGH - All 6 selection regression tests, crash smoke test, and 4 new Windows 11 optimization tests pass cleanly.
+
+---
+
 ## Session - 2026-10-18 20:05 IST (Modifier Wheel Scrolling)
 
 ### What Was Done

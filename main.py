@@ -13,7 +13,6 @@ import atexit
 import ctypes
 from ctypes import wintypes
 import math
-import keyboard
 import os
 import gc
 
@@ -28,16 +27,43 @@ from process_manager import SingleInstanceGuard
 # ── Windows 11 Optimization (Hardware & Process) ──
 if sys.platform == "win32":
     try:
-        # Force Direct3D 11 backend for PyQt6 RHI
+        # 1. Force Qt6 to use native Windows Ink (WM_POINTER) instead of legacy Wintab
+        os.environ["QT_WINTAB"] = "0"
+        
+        # 2. RHI backend configuration
         os.environ["QSG_RHI_BACKEND"] = "d3d11"
         
-        # 1. Enable Per-Monitor V2 DPI Awareness for crisp UI
-        ctypes.windll.shcore.SetProcessDpiAwareness(2)
+        # 3. Enable Per-Monitor V2 DPI Awareness for crisp multi-monitor rendering
+        try:
+            _user32_dpi = ctypes.windll.user32
+            _user32_dpi.SetProcessDpiAwarenessContext.argtypes = [ctypes.c_void_p]
+            _user32_dpi.SetProcessDpiAwarenessContext.restype = ctypes.c_bool
+            _user32_dpi.SetProcessDpiAwarenessContext(ctypes.c_void_p(-4))
+        except Exception:
+            try:
+                ctypes.windll.shcore.SetProcessDpiAwareness(2)
+            except Exception:
+                pass
         
-        # 2. Elevate Process Priority to HIGH_PRIORITY_CLASS to prevent lag
+        # 4. Set Process Priority to ABOVE_NORMAL_PRIORITY_CLASS to prevent lag without starving OS audio/services
         kernel32 = ctypes.windll.kernel32
-        HIGH_PRIORITY_CLASS = 0x00000080
-        kernel32.SetPriorityClass(kernel32.GetCurrentProcess(), HIGH_PRIORITY_CLASS)
+        kernel32.SetPriorityClass.argtypes = [wintypes.HANDLE, wintypes.DWORD]
+        kernel32.SetPriorityClass.restype = wintypes.BOOL
+        ABOVE_NORMAL_PRIORITY_CLASS = 0x00008000
+        kernel32.SetPriorityClass(kernel32.GetCurrentProcess(), ABOVE_NORMAL_PRIORITY_CLASS)
+        
+        # 5. Disable Windows 11 EcoQoS Power Throttling to keep drawing responsive on Intel/AMD hybrid CPUs
+        class PROCESS_POWER_THROTTLING_STATE(ctypes.Structure):
+            _fields_ = [
+                ("Version", wintypes.DWORD),
+                ("ControlMask", wintypes.DWORD),
+                ("StateMask", wintypes.DWORD),
+            ]
+        if hasattr(kernel32, "SetProcessInformation"):
+            kernel32.SetProcessInformation.argtypes = [wintypes.HANDLE, wintypes.DWORD, wintypes.LPVOID, wintypes.DWORD]
+            kernel32.SetProcessInformation.restype = wintypes.BOOL
+            throttle = PROCESS_POWER_THROTTLING_STATE(1, 0x1, 0)
+            kernel32.SetProcessInformation(kernel32.GetCurrentProcess(), 4, ctypes.byref(throttle), ctypes.sizeof(throttle))
     except Exception as e:
         print(f"Warning: Optimization setup failed: {e}")
 
@@ -46,8 +72,14 @@ from PyQt6.QtWidgets import (
     QPushButton, QLabel, QGridLayout, QSystemTrayIcon, QMenu, QFrame,
     QGraphicsDropShadowEffect, QMessageBox, QGraphicsOpacityEffect
 )
-from PyQt6.QtCore import Qt, QPoint, QRect, QRectF, pyqtSignal, QObject, QTimer, QPointF, QPropertyAnimation, QEasingCurve, QSize, QEvent
-from PyQt6.QtGui import QPainter, QPen, QColor, QPainterPath, QPainterPathStroker, QPixmap, QIcon, QCursor, QFont, QTransform, QPolygonF
+from PyQt6.QtCore import (
+    Qt, QPoint, QRect, QRectF, pyqtSignal, QObject, QTimer, QPointF,
+    QPropertyAnimation, QEasingCurve, QSize, QEvent, QAbstractNativeEventFilter
+)
+from PyQt6.QtGui import (
+    QPainter, QPen, QColor, QPainterPath, QPainterPathStroker, QPixmap,
+    QIcon, QCursor, QFont, QTransform, QPolygonF
+)
 
 # ── Windows API constants for click-through ──
 WS_EX_TRANSPARENT = 0x00000020
@@ -69,6 +101,27 @@ _PostMessage.argtypes = [
     wintypes.LPARAM,
 ]
 _PostMessage.restype = wintypes.BOOL
+
+_user32.RegisterHotKey.argtypes = [wintypes.HWND, wintypes.INT, wintypes.UINT, wintypes.UINT]
+_user32.RegisterHotKey.restype = wintypes.BOOL
+_user32.UnregisterHotKey.argtypes = [wintypes.HWND, wintypes.INT]
+_user32.UnregisterHotKey.restype = wintypes.BOOL
+_user32.SetPropW.argtypes = [wintypes.HWND, wintypes.LPCWSTR, wintypes.HANDLE]
+_user32.SetPropW.restype = wintypes.BOOL
+
+WM_HOTKEY = 0x0312
+MOD_ALT = 0x0001
+MOD_CONTROL = 0x0002
+MOD_SHIFT = 0x0004
+MOD_WIN = 0x0008
+MOD_NOREPEAT = 0x4000
+
+# Tablet service property for Windows Ink to disable 300ms hold delay & flicks
+TABLET_DISABLE_PRESSANDHOLD = 0x00000001
+TABLET_DISABLE_PENTAPFEEDBACK = 0x00000008
+TABLET_DISABLE_FLICKS = 0x00010000
+TABLET_SERVICE_PROPERTY_FLAGS = TABLET_DISABLE_PRESSANDHOLD | TABLET_DISABLE_PENTAPFEEDBACK | TABLET_DISABLE_FLICKS
+
 WM_MOUSEWHEEL = 0x020A
 WM_MOUSEHWHEEL = 0x020E
 MK_CONTROL = 0x0008
@@ -511,6 +564,7 @@ class FloatingPanel(QWidget):
             dist = math.hypot(self.x() - docked_pos.x(), self.y() - docked_pos.y())
             if dist <= 35:
                 self.is_detached = False
+                self.has_been_dragged = False
                 self.move(docked_pos)
             else:
                 self.is_detached = True
@@ -760,6 +814,7 @@ class DragHandle(QWidget):
                 dist = math.hypot(parent.x() - docked_pos.x(), parent.y() - docked_pos.y())
                 if dist <= 35:
                     parent.is_detached = False
+                    parent.has_been_dragged = False
                     parent.move(docked_pos)
                 else:
                     parent.is_detached = True
@@ -888,7 +943,22 @@ class OverlayWindow(QMainWindow):
         self.canvas_cache = None
         self._init_canvas_cache()
 
+        # Disable tablet press-and-hold delay and flicks on the overlay window
+        self._explicit_hide = False
+        self.hotkey_mgr = None
+        try:
+            hwnd = int(self.winId())
+            _user32.SetPropW(hwnd, "MicrosoftTabletPenServiceProperty", TABLET_SERVICE_PROPERTY_FLAGS)
+        except Exception as e:
+            print(f"Warning: Failed to set tablet property: {e}")
+
         self.set_mode(ToolMode.PEN)
+
+    def _sync_scoped_hotkeys(self):
+        """Synchronize Win32 scoped hotkeys with active tool mode and ink visibility."""
+        if hasattr(self, 'hotkey_mgr') and self.hotkey_mgr:
+            scoped = bool(self.ink_visible and self.mode != ToolMode.CURSOR)
+            self.hotkey_mgr.set_scoped_enabled(scoped)
 
     # ── GC safety ──
 
@@ -1066,6 +1136,7 @@ class OverlayWindow(QMainWindow):
         self.mode = new_mode
         self.set_click_through(new_mode == ToolMode.CURSOR or not self.ink_visible)
         self._update_cursor()
+        self._sync_scoped_hotkeys()
 
     def set_shape(self, shape_type):
         self.current_shape = shape_type
@@ -1125,6 +1196,7 @@ class OverlayWindow(QMainWindow):
             self.set_mode(ToolMode.PEN)
         self.set_click_through(not self.ink_visible or self.mode == ToolMode.CURSOR)
         self.signals.visibility_changed.emit(self.ink_visible)
+        self._sync_scoped_hotkeys()
         self.update()
 
     def set_click_through(self, enabled):
@@ -1553,7 +1625,20 @@ class OverlayWindow(QMainWindow):
     def changeEvent(self, event):
         if event.type() == QEvent.Type.DevicePixelRatioChange:
             self._sync_dpi_backing_store()
+        elif event.type() == QEvent.Type.WindowStateChange:
+            if self.isMinimized() and self.ink_visible:
+                # Windows 11 Show Desktop (Win+D) minimized the overlay.
+                # Auto-restore it so the annotation layer stays visible over the desktop.
+                QTimer.singleShot(50, self._restore_overlay_from_minimize)
         super().changeEvent(event)
+
+    def _restore_overlay_from_minimize(self):
+        if self.ink_visible and (self.isMinimized() or not self.isVisible()):
+            self.showNormal()
+            self.raise_()
+            if hasattr(self, 'toolbar') and self.toolbar:
+                self.toolbar.showNormal()
+                self.toolbar.raise_()
 
     def showEvent(self, event):
         super().showEvent(event)
@@ -1654,6 +1739,9 @@ class OverlayWindow(QMainWindow):
         self._tablet_pressure = 1.0
         self.current_pen = None
         self._cancel_selection_interaction()
+        if self.ink_visible and not getattr(self, '_explicit_hide', False):
+            # OS or shell hid the window externally while ink should be visible.
+            QTimer.singleShot(50, self._restore_overlay_from_minimize)
         super().hideEvent(event)
 
     def mousePressEvent(self, event):
@@ -1746,9 +1834,13 @@ class OverlayWindow(QMainWindow):
                 
                 for i in range(len(self.paths) - 1, -1, -1):
                     p = self.paths[i]['path']
-                    stroker = QPainterPathStroker()
-                    stroker.setWidth(max(12.0, self.paths[i]['pen'].widthF() + 8.0))
-                    stroked_path = stroker.createStroke(p)
+                    stroked_path = self.paths[i].get('hit_path')
+                    if stroked_path is None:
+                        stroker = QPainterPathStroker()
+                        stroker.setWidth(max(12.0, self.paths[i]['pen'].widthF() + 8.0))
+                        stroker.setCapStyle(Qt.PenCapStyle.RoundCap)
+                        stroked_path = stroker.createStroke(p)
+                        self.paths[i]['hit_path'] = stroked_path
                     
                     hit = stroked_path.contains(event.position()) or stroked_path.intersects(hit_box)
                     hit = hit or p.contains(event.position()) or p.intersects(hit_box)
@@ -1824,13 +1916,18 @@ class OverlayWindow(QMainWindow):
         if ((event.buttons() & Qt.MouseButton.LeftButton) or getattr(self, '_tablet_active', False)) and not self.is_click_through:
             if self.mode == ToolMode.SELECT:
                 if self.is_lassoing and self.lasso_path is not None:
-                    self.lasso_path.lineTo(event.position())
-                    self.update()
+                    last_pos = getattr(self, '_lasso_last_pos', None) or event.position()
+                    cur_pos = event.position()
+                    self.lasso_path.lineTo(cur_pos)
+                    self._lasso_last_pos = cur_pos
+                    dirty = QRectF(last_pos, cur_pos).normalized().adjusted(-8.0, -8.0, 8.0, 8.0)
+                    self.update(dirty.toRect())
                     return
                     
                 if self.selection_action == 'drag' and self.selected_path_indices:
                     delta = event.position() - self.selection_start_pos
                     transform = QTransform().translate(delta.x(), delta.y())
+                    old_obb_rect = self.master_obb.boundingRect() if self.master_obb is not None else QRectF()
                     for state in self.selection_start_states:
                         idx = state['index']
                         if idx < len(self.paths):
@@ -1839,7 +1936,9 @@ class OverlayWindow(QMainWindow):
                             if state.get('points') is not None:
                                 self.paths[idx]['points'] = [transform.map(pt) for pt in state['points']]
                     self.master_obb = transform.map(self.selection_start_master_obb)
-                    self.update()
+                    new_obb_rect = self.master_obb.boundingRect() if self.master_obb is not None else QRectF()
+                    dirty = old_obb_rect.united(new_obb_rect).adjusted(-40.0, -40.0, 40.0, 40.0)
+                    self.update(dirty.toRect())
                 elif self.selection_action == 'rotate' and self.selected_path_indices:
                     center = self.selection_start_center
                     current_angle = math.atan2(event.position().y() - center.y(), event.position().x() - center.x())
@@ -1848,6 +1947,7 @@ class OverlayWindow(QMainWindow):
                         angle_diff = round(angle_diff / 15.0) * 15.0
                     
                     transform = QTransform().translate(center.x(), center.y()).rotate(angle_diff).translate(-center.x(), -center.y())
+                    old_obb_rect = self.master_obb.boundingRect() if self.master_obb is not None else QRectF()
                     for state in self.selection_start_states:
                         idx = state['index']
                         if idx < len(self.paths):
@@ -1856,7 +1956,9 @@ class OverlayWindow(QMainWindow):
                             if state.get('points') is not None:
                                 self.paths[idx]['points'] = [transform.map(pt) for pt in state['points']]
                     self.master_obb = transform.map(self.selection_start_master_obb)
-                    self.update()
+                    new_obb_rect = self.master_obb.boundingRect() if self.master_obb is not None else QRectF()
+                    dirty = old_obb_rect.united(new_obb_rect).adjusted(-40.0, -40.0, 40.0, 40.0)
+                    self.update(dirty.toRect())
                 elif self.selection_action == 'scale' and self.selected_path_indices:
                     if self.selection_resize_pending:
                         if math.hypot(
@@ -1924,6 +2026,7 @@ class OverlayWindow(QMainWindow):
                                                 .rotate(-angle) \
                                                 .translate(-anchor.x(), -anchor.y())
 
+                        old_obb_rect = self.master_obb.boundingRect() if self.master_obb is not None else QRectF()
                         for state in self.selection_start_states:
                             idx = state['index']
                             if idx < len(self.paths):
@@ -1932,7 +2035,9 @@ class OverlayWindow(QMainWindow):
                                 if state.get('points') is not None:
                                     self.paths[idx]['points'] = [transform.map(pt) for pt in state['points']]
                         self.master_obb = transform.map(self.selection_start_master_obb)
-                        self.update()
+                        new_obb_rect = self.master_obb.boundingRect() if self.master_obb is not None else QRectF()
+                        dirty = old_obb_rect.united(new_obb_rect).adjusted(-40.0, -40.0, 40.0, 40.0)
+                        self.update(dirty.toRect())
                 return
 
             if self.drawing and self.mode == ToolMode.ERASER:
@@ -1949,7 +2054,7 @@ class OverlayWindow(QMainWindow):
                 new_rect = self.current_path.boundingRect()
                 update_rect = old_rect.united(new_rect)
                 
-                padding = max(100.0, self.current_pen.widthF() * 4.0)
+                padding = max(24.0, self.current_pen.widthF() * 2.0)
                 update_rect.adjust(-padding, -padding, padding, padding)
                 self.update(update_rect.toRect())
                 self.last_point = event.position()
@@ -1962,7 +2067,7 @@ class OverlayWindow(QMainWindow):
                 prev_point = self.raw_points[-2] if len(self.raw_points) > 1 else self.last_point
                 self.last_point = event.position()
 
-                padding = max(150.0, self.current_pen.widthF() * 6.0)
+                padding = max(24.0, self.current_pen.widthF() * 2.0)
                 
                 # Calculate the bounding box of the new curve segment
                 update_rect = QRectF(prev_point, event.position()).normalized()
@@ -2001,6 +2106,14 @@ class OverlayWindow(QMainWindow):
                 
                 if self.selection_action in ('drag', 'rotate', 'scale'):
                     self._record_selection_transform()
+                    for idx in self.selected_path_indices:
+                        if idx < len(self.paths):
+                            s = self.paths[idx]
+                            s_stroker = QPainterPathStroker()
+                            s_pen_w = s.get('pen', QPen()).widthF()
+                            s_stroker.setWidth(max(12.0, s_pen_w + 8.0))
+                            s_stroker.setCapStyle(Qt.PenCapStyle.RoundCap)
+                            s['hit_path'] = s_stroker.createStroke(s['path'])
                     self._rebake_cache(exclude_indices=self.selected_path_indices)
                 self.selection_action = None
                 self.selection_resize_pending = False
@@ -2051,11 +2164,19 @@ class OverlayWindow(QMainWindow):
                     self._prune_undo_refs(evicted_stroke)
 
                 obb = QPolygonF(self.current_path.boundingRect())
+                pen = self.current_pen or self._get_current_pen()
+                pen_w = pen.widthF()
+                stroker = QPainterPathStroker()
+                stroker.setWidth(max(12.0, pen_w + 8.0))
+                stroker.setCapStyle(Qt.PenCapStyle.RoundCap)
+                hit_path = stroker.createStroke(self.current_path)
+
                 stroke = {
                     'path': self.current_path,
-                    'pen': self.current_pen or self._get_current_pen(),
+                    'pen': pen,
                     'mode': self.mode,
                     'obb': obb,
+                    'hit_path': hit_path,
                 }
                 # Store pressure data for variable-width rendering (pen & highlighter only, not detected shapes)
                 if self.mode in (ToolMode.PEN, ToolMode.HIGHLIGHTER) and not self.shape_detected and self.raw_pressures:
@@ -2178,10 +2299,13 @@ class OverlayWindow(QMainWindow):
             if not p_bound.intersects(sweep_rect):
                 continue
 
-            p_stroker = QPainterPathStroker()
-            p_stroker.setWidth(max(4.0, pen_w))
-            p_stroker.setCapStyle(Qt.PenCapStyle.RoundCap)
-            p_stroked = p_stroker.createStroke(p)
+            p_stroked = item.get('hit_path')
+            if p_stroked is None:
+                p_stroker = QPainterPathStroker()
+                p_stroker.setWidth(max(12.0, pen_w + 8.0))
+                p_stroker.setCapStyle(Qt.PenCapStyle.RoundCap)
+                p_stroked = p_stroker.createStroke(p)
+                item['hit_path'] = p_stroked
 
             if p_stroked.intersects(stroked_sweep) or p.intersects(stroked_sweep) or p_stroked.intersects(sweep_path) or p.intersects(sweep_path):
                 removed_stroke = self.paths.pop(i)
@@ -3046,36 +3170,118 @@ class AppSystemTray(QSystemTrayIcon):
         QMessageBox.information(None, "About Pen 11", "Pen 11\n\nDeveloped by Narayan Dev\n\nAn optimized screen annotation tool for Windows 11.")
 
 
-# ── Global Shortcuts ──
+# ── Native Win32 Global Hotkeys ──
+
+VK_1 = 0x31
+VK_2 = 0x32
+VK_3 = 0x33
+VK_4 = 0x34
+VK_5 = 0x35
+VK_B = 0x42
+VK_C = 0x43
+VK_P = 0x50
+VK_Q = 0x51
+VK_Z = 0x5A
+VK_OEM_4 = 0xDB  # '['
+VK_OEM_6 = 0xDD  # ']'
+
+class Win32HotKeyManager(QAbstractNativeEventFilter):
+    """
+    Native Win32 Global Hotkey Manager using RegisterHotKey / WM_HOTKEY.
+    Eliminates WH_KEYBOARD_LL low-level hook timeouts, context-switch lag,
+    and antivirus false-positives. Scopes drawing shortcuts (Ctrl+Z, Ctrl+P, Ctrl+B, etc.)
+    so they only intercept when drawing is active, leaving other Windows applications unhindered.
+    """
+    def __init__(self, coordinator):
+        super().__init__()
+        self.coordinator = coordinator
+        self.registered = {}        # hotkey_id -> (mod, vk, callback)
+        self.scoped_hotkeys = {}    # hotkey_id -> (mod, vk, callback)
+        self._scoped_active = False
+
+    def register_global(self, hotkey_id, mod, vk, callback):
+        """Always active globally across the system."""
+        if _user32.RegisterHotKey(None, hotkey_id, mod | MOD_NOREPEAT, vk):
+            self.registered[hotkey_id] = (mod, vk, callback)
+        elif _user32.RegisterHotKey(None, hotkey_id, mod, vk):
+            self.registered[hotkey_id] = (mod, vk, callback)
+        else:
+            print(f"Warning: Failed to register global hotkey {hotkey_id}")
+
+    def register_scoped(self, hotkey_id, mod, vk, callback):
+        """Only active while ink is visible and tool is not Cursor."""
+        self.scoped_hotkeys[hotkey_id] = (mod, vk, callback)
+        if self._scoped_active:
+            self._activate_scoped_single(hotkey_id)
+
+    def _activate_scoped_single(self, hotkey_id):
+        if hotkey_id not in self.registered and hotkey_id in self.scoped_hotkeys:
+            mod, vk, callback = self.scoped_hotkeys[hotkey_id]
+            if _user32.RegisterHotKey(None, hotkey_id, mod | MOD_NOREPEAT, vk):
+                self.registered[hotkey_id] = (mod, vk, callback)
+            elif _user32.RegisterHotKey(None, hotkey_id, mod, vk):
+                self.registered[hotkey_id] = (mod, vk, callback)
+
+    def set_scoped_enabled(self, enabled):
+        if self._scoped_active == enabled:
+            return
+        self._scoped_active = enabled
+        if enabled:
+            for hotkey_id in self.scoped_hotkeys:
+                self._activate_scoped_single(hotkey_id)
+        else:
+            for hotkey_id in self.scoped_hotkeys:
+                if hotkey_id in self.registered:
+                    _user32.UnregisterHotKey(None, hotkey_id)
+                    del self.registered[hotkey_id]
+
+    def unregister_all(self):
+        for hotkey_id in list(self.registered.keys()):
+            _user32.UnregisterHotKey(None, hotkey_id)
+        self.registered.clear()
+
+    def nativeEventFilter(self, event_type, message):
+        if event_type == b"windows_generic_MSG":
+            msg = wintypes.MSG.from_address(int(message))
+            if msg.message == WM_HOTKEY:
+                hotkey_id = int(msg.wParam)
+                info = self.registered.get(hotkey_id)
+                if info:
+                    callback = info[2]
+                    try:
+                        callback()
+                    except Exception as e:
+                        print(f"Error executing hotkey {hotkey_id}: {e}")
+                    return True, 0
+        return False, 0
 
 def setup_global_shortcuts(coordinator):
     signals = coordinator.signals
+    mgr = Win32HotKeyManager(coordinator)
     
-    def execute_if_visible(callback):
-        def wrapper():
-            if getattr(coordinator.overlay, 'ink_visible', True):
-                callback()
-        return wrapper
-            
-    hotkeys = {
-        'ctrl+1': signals.switch_pen.emit,
-        'ctrl+2': execute_if_visible(signals.switch_highlighter.emit),
-        'ctrl+3': execute_if_visible(signals.switch_eraser.emit),
-        'ctrl+4': execute_if_visible(signals.switch_cursor.emit),
-        'ctrl+5': signals.toggle_visibility.emit,
-        'ctrl+z': execute_if_visible(signals.undo.emit),
-        'ctrl+shift+c': execute_if_visible(signals.clear_screen.emit),
-        'ctrl+q': signals.exit_app.emit,
-        'ctrl+]': execute_if_visible(signals.increment_size.emit),
-        'ctrl+[': execute_if_visible(signals.decrement_size.emit),
-        'ctrl+p': execute_if_visible(signals.toggle_color_palette.emit),
-        'ctrl+b': execute_if_visible(signals.toggle_background.emit),
-    }
-    for combo, callback in hotkeys.items():
-        try:
-            keyboard.add_hotkey(combo, callback, suppress=True)
-        except Exception as e:
-            print(f"Warning: Failed to register hotkey '{combo}': {e}")
+    # Global hotkeys (always active)
+    mgr.register_global(1, MOD_CONTROL, VK_1, signals.switch_pen.emit)
+    mgr.register_global(2, MOD_CONTROL, VK_2, signals.switch_highlighter.emit)
+    mgr.register_global(3, MOD_CONTROL, VK_3, signals.switch_eraser.emit)
+    mgr.register_global(4, MOD_CONTROL, VK_4, signals.switch_cursor.emit)
+    mgr.register_global(5, MOD_CONTROL, VK_5, signals.toggle_visibility.emit)
+    mgr.register_global(6, MOD_CONTROL, VK_Q, signals.exit_app.emit)
+
+    # Scoped hotkeys (only active when drawing ink is visible and not in Cursor mode)
+    mgr.register_scoped(10, MOD_CONTROL, VK_Z, signals.undo.emit)
+    mgr.register_scoped(11, MOD_CONTROL | MOD_SHIFT, VK_C, signals.clear_screen.emit)
+    mgr.register_scoped(12, MOD_CONTROL, VK_OEM_6, signals.increment_size.emit)
+    mgr.register_scoped(13, MOD_CONTROL, VK_OEM_4, signals.decrement_size.emit)
+    mgr.register_scoped(14, MOD_CONTROL, VK_P, signals.toggle_color_palette.emit)
+    mgr.register_scoped(15, MOD_CONTROL, VK_B, signals.toggle_background.emit)
+
+    QApplication.instance().installNativeEventFilter(mgr)
+    coordinator.hotkey_mgr = mgr
+    coordinator.overlay.hotkey_mgr = mgr
+    
+    # Initial state sync
+    init_scoped = getattr(coordinator.overlay, 'ink_visible', True) and getattr(coordinator.overlay, 'mode', None) != ToolMode.CURSOR
+    mgr.set_scoped_enabled(init_scoped)
 
 
 # ── App Coordinator ──
@@ -3371,7 +3577,8 @@ class MainAppCoordinator(QObject):
             'highlighter_size': self.overlay.highlighter_size,
             'eraser_size': self.overlay.eraser_size,
         })
-        keyboard.unhook_all()
+        if hasattr(self, 'hotkey_mgr') and self.hotkey_mgr:
+            self.hotkey_mgr.unregister_all()
         if hasattr(self, 'tray') and self.tray:
             self.tray.hide()
         QApplication.instance().quit()
@@ -3393,6 +3600,9 @@ if __name__ == '__main__':
     coordinator = MainAppCoordinator()
     guard.wakeup.connect(coordinator.wakeup)
     app.aboutToQuit.connect(coordinator._quit_app)  # save settings on OS shutdown
-    # Safety net: ensure keyboard hooks are removed even on unhandled crash
-    atexit.register(keyboard.unhook_all)
+    
+    def _cleanup_hotkeys():
+        if hasattr(coordinator, 'hotkey_mgr') and coordinator.hotkey_mgr:
+            coordinator.hotkey_mgr.unregister_all()
+    atexit.register(_cleanup_hotkeys)
     sys.exit(app.exec())
