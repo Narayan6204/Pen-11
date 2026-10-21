@@ -64,6 +64,12 @@ if sys.platform == "win32":
             kernel32.SetProcessInformation.restype = wintypes.BOOL
             throttle = PROCESS_POWER_THROTTLING_STATE(1, 0x1, 0)
             kernel32.SetProcessInformation(kernel32.GetCurrentProcess(), 4, ctypes.byref(throttle), ctypes.sizeof(throttle))
+
+        # 6. Explicit AppUserModelID to ensure Windows 11 pins and preserves tray icon & taskbar grouping
+        try:
+            ctypes.windll.shell32.SetCurrentProcessExplicitAppUserModelID("NarayanDev.Pen11.App.2.0")
+        except Exception:
+            pass
     except Exception as e:
         print(f"Warning: Optimization setup failed: {e}")
 
@@ -855,7 +861,6 @@ class OverlayWindow(QMainWindow):
         self.bg_mode = BackgroundMode.TRANSPARENT
         self.is_click_through = False
         self.ink_visible = True
-        self.shape_detected = False
         self.current_shape = ShapeType.LINE
 
         # Colors and sizes
@@ -1891,7 +1896,6 @@ class OverlayWindow(QMainWindow):
 
             self.raw_points = [event.position()]
             self.raw_pressures = [self._tablet_pressure]
-            self.shape_detected = False
             self.shape_start = event.position()
             self.last_erase_pos = event.position()
             if self.mode == ToolMode.ERASER:
@@ -2058,7 +2062,7 @@ class OverlayWindow(QMainWindow):
                 update_rect.adjust(-padding, -padding, padding, padding)
                 self.update(update_rect.toRect())
                 self.last_point = event.position()
-            elif self.drawing and self.current_path and not self.shape_detected:
+            elif self.drawing and self.current_path:
                 self.raw_points.append(event.position())
                 self.raw_pressures.append(self._tablet_pressure)
                 mid_point = (self.last_point + event.position()) / 2.0
@@ -2141,13 +2145,7 @@ class OverlayWindow(QMainWindow):
                     self.update()
                     return
 
-                # Detect smart shapes only after the stroke ends. Running this
-                # while the pointer is paused can replace an active stroke and
-                # discard all points drawn afterward.
-                if self.mode == ToolMode.PEN and not self.shape_detected:
-                    self._detect_shape()
-
-                if self.mode != ToolMode.SHAPE and not self.shape_detected:
+                if self.mode != ToolMode.SHAPE:
                     self.current_path.lineTo(event.position())
                     self.raw_points.append(event.position())
                     self.raw_pressures.append(self._tablet_pressure)
@@ -2178,8 +2176,8 @@ class OverlayWindow(QMainWindow):
                     'obb': obb,
                     'hit_path': hit_path,
                 }
-                # Store pressure data for variable-width rendering (pen & highlighter only, not detected shapes)
-                if self.mode in (ToolMode.PEN, ToolMode.HIGHLIGHTER) and not self.shape_detected and self.raw_pressures:
+                # Store pressure data for variable-width rendering (pen & highlighter)
+                if self.mode in (ToolMode.PEN, ToolMode.HIGHLIGHTER) and self.raw_pressures:
                     stroke['points'] = list(self.raw_points)
                     stroke['pressures'] = list(self.raw_pressures)
                 self.paths.append(stroke)
@@ -2325,49 +2323,6 @@ class OverlayWindow(QMainWindow):
             self.raw_pressures = []
             self._rebake_cache(exclude_indices=self.selected_path_indices)
             self.update()
-
-    # ── Shape detection ──
-
-    def _detect_shape(self):
-        # Guard: if stroke was already committed or cancelled, do nothing
-        if self.current_path is None or not self.drawing:
-            return
-        if len(self.raw_points) < 10:
-            return
-        start, end = self.raw_points[0], self.raw_points[-1]
-        xs = [p.x() for p in self.raw_points]
-        ys = [p.y() for p in self.raw_points]
-        min_x, max_x = min(xs), max(xs)
-        min_y, max_y = min(ys), max(ys)
-        width, height = max_x - min_x, max_y - min_y
-        if width < 5 and height < 5:
-            return  # degenerate tap, not a shape
-
-        path_length = sum(
-            math.hypot(self.raw_points[i + 1].x() - self.raw_points[i].x(),
-                       self.raw_points[i + 1].y() - self.raw_points[i].y())
-            for i in range(len(self.raw_points) - 1)
-        )
-        direct_dist = math.hypot(end.x() - start.x(), end.y() - start.y())
-
-        new_path = QPainterPath()
-        # Circle / ellipse detection
-        if direct_dist < max(width, height) * 0.3:
-            new_path.addEllipse(QRectF(min_x, min_y, width, height))
-            self._replace_current_path(new_path)
-            return
-        # Straight line detection
-        if path_length > 0 and (direct_dist / path_length) > 0.85:
-            new_path.moveTo(start)
-            new_path.lineTo(end)
-            self._replace_current_path(new_path)
-
-    def _replace_current_path(self, new_path):
-        self.shape_detected = True
-        self.current_path = new_path
-        self.raw_points = []
-        self.raw_pressures = []
-        self.update()
 
     # ── Painting ──
 
@@ -3144,16 +3099,30 @@ def resource_path(relative_path):
         # PyInstaller creates a temp folder and stores path in _MEIPASS
         base_path = sys._MEIPASS
     except Exception:
-        base_path = os.path.abspath(".")
+        base_path = os.path.dirname(os.path.abspath(__file__))
     return os.path.join(base_path, relative_path)
 
 class AppSystemTray(QSystemTrayIcon):
     def __init__(self, signals, parent=None):
-        icon_path = resource_path("app_icon.ico")
-        icon = QIcon(icon_path)
+        icon = QIcon()
+        ico_path = resource_path("app_icon.ico")
+        png_path = resource_path("app_icon.png")
+        if os.path.exists(ico_path):
+            icon.addFile(ico_path)
+        if os.path.exists(png_path):
+            icon.addFile(png_path)
         if icon.isNull():
-            pixmap = QPixmap(16, 16)
+            # Robust painted fallback icon: crisp, rounded Pen 11 badge (never transparent!)
+            pixmap = QPixmap(32, 32)
             pixmap.fill(Qt.GlobalColor.transparent)
+            p = QPainter(pixmap)
+            p.setRenderHint(QPainter.RenderHint.Antialiasing)
+            p.setBrush(QColor("#007AFF"))
+            p.setPen(Qt.PenStyle.NoPen)
+            p.drawRoundedRect(0, 0, 32, 32, 7, 7)
+            p.setPen(QPen(QColor("white"), 3, Qt.PenStyle.SolidLine, Qt.PenCapStyle.RoundCap))
+            p.drawLine(8, 24, 24, 8)
+            p.end()
             icon = QIcon(pixmap)
         super().__init__(icon, parent)
         self.setToolTip("Pen 11")
@@ -3588,7 +3557,13 @@ class MainAppCoordinator(QObject):
 
 if __name__ == '__main__':
     app = QApplication(sys.argv)
-    app.setWindowIcon(QIcon(resource_path("app_icon.ico")))
+    main_icon = QIcon()
+    for icon_name in ("app_icon.ico", "app_icon.png"):
+        p = resource_path(icon_name)
+        if os.path.exists(p):
+            main_icon.addFile(p)
+    if not main_icon.isNull():
+        app.setWindowIcon(main_icon)
     app.setQuitOnLastWindowClosed(False)
 
     # Single instance guard — prevent duplicate processes
