@@ -8,6 +8,8 @@ if sys.platform != "win32":
     print("It will not run on macOS or Linux.")
     sys.exit(1)
 
+import atexit
+
 import ctypes
 from ctypes import wintypes
 import math
@@ -826,6 +828,12 @@ class OverlayWindow(QMainWindow):
         self._pre_eraser_mode = None    # Tool mode before eraser-end auto-switch
         self._cursor_cache = {}
 
+        # GC safety watchdog: re-enables GC if it stays disabled > 30s (e.g. exception mid-stroke)
+        self._gc_watchdog = QTimer(self)
+        self._gc_watchdog.setSingleShot(True)
+        self._gc_watchdog.setInterval(30000)
+        self._gc_watchdog.timeout.connect(self._gc_watchdog_fire)
+
         # Select state
         self.selected_path_indices = []
         self.master_obb = None
@@ -881,6 +889,27 @@ class OverlayWindow(QMainWindow):
         self._init_canvas_cache()
 
         self.set_mode(ToolMode.PEN)
+
+    # ── GC safety ──
+
+    def _gc_watchdog_fire(self):
+        """Safety net: re-enable GC if it stayed disabled too long (e.g. exception mid-stroke)."""
+        if not gc.isenabled():
+            gc.enable()
+            gc.collect(0)
+        self.drawing = False
+
+    def _gc_safe_disable(self):
+        """Disable GC for drawing performance, with watchdog backup."""
+        gc.disable()
+        self._gc_watchdog.start()
+
+    def _gc_safe_enable(self):
+        """Re-enable GC and cancel the watchdog."""
+        self._gc_watchdog.stop()
+        if not gc.isenabled():
+            gc.enable()
+            gc.collect(0)
 
     # ── Size adjustments ──
 
@@ -1006,8 +1035,7 @@ class OverlayWindow(QMainWindow):
         while QApplication.overrideCursor() is not None:
             QApplication.restoreOverrideCursor()
         # Safety: re-enable GC if a mid-stroke keyboard shortcut bypassed mouseReleaseEvent
-        if not gc.isenabled():
-            gc.enable()
+        self._gc_safe_enable()
         self.drawing = False
         self.raw_points = []
         self.raw_pressures = []
@@ -1080,8 +1108,7 @@ class OverlayWindow(QMainWindow):
         # Safety: if user hides mid-stroke, restore blank cursor and GC
         while QApplication.overrideCursor() is not None:
             QApplication.restoreOverrideCursor()
-        if not gc.isenabled():
-            gc.enable()
+        self._gc_safe_enable()
         self.drawing = False
         self.current_path = None   # discard any partially drawn stroke
         self.current_pen = None
@@ -1178,7 +1205,9 @@ class OverlayWindow(QMainWindow):
             color.setAlpha(60)
             return QPen(color, self.highlighter_size, Qt.PenStyle.SolidLine, Qt.PenCapStyle.RoundCap, Qt.PenJoinStyle.RoundJoin)
         elif self.mode == ToolMode.ERASER:
-            return QPen(QColor(255, 255, 255, 255), self.eraser_size, Qt.PenStyle.SolidLine, Qt.PenCapStyle.RoundCap, Qt.PenJoinStyle.RoundJoin)
+            # Transparent pen: eraser works by removing strokes, not by drawing.
+            # Strokes with mode==ERASER are never baked to cache (_bake_stroke_to_cache skips them).
+            return QPen(QColor(0, 0, 0, 0), self.eraser_size, Qt.PenStyle.SolidLine, Qt.PenCapStyle.RoundCap, Qt.PenJoinStyle.RoundJoin)
         else:
             return QPen(self.pen_color, self.pen_size, Qt.PenStyle.SolidLine, Qt.PenCapStyle.RoundCap, Qt.PenJoinStyle.RoundJoin)
 
@@ -1608,8 +1637,7 @@ class OverlayWindow(QMainWindow):
     def focusOutEvent(self, event):
         """Re-enable GC if focus is lost mid-stroke (e.g. Alt+Tab)."""
         self._finish_erase_action()
-        if not gc.isenabled():
-            gc.enable()
+        self._gc_safe_enable()
         self.drawing = False
         self._tablet_active = False
         self._tablet_pressure = 1.0
@@ -1620,8 +1648,7 @@ class OverlayWindow(QMainWindow):
     def hideEvent(self, event):
         """Re-enable GC if window is hidden mid-stroke."""
         self._finish_erase_action()
-        if not gc.isenabled():
-            gc.enable()
+        self._gc_safe_enable()
         self.drawing = False
         self._tablet_active = False
         self._tablet_pressure = 1.0
@@ -1768,7 +1795,7 @@ class OverlayWindow(QMainWindow):
             self.current_pen = self._get_current_pen()
             
             # Disable GC during active drawing to prevent micro-stutter frame drops
-            gc.disable()
+            self._gc_safe_disable()
 
             self.raw_points = [event.position()]
             self.raw_pressures = [self._tablet_pressure]
@@ -1985,8 +2012,7 @@ class OverlayWindow(QMainWindow):
                 self._finish_erase_action()
                 self.drawing = False
                 self.last_erase_pos = None
-                if not gc.isenabled():
-                    gc.enable()
+                self._gc_safe_enable()
 
             while QApplication.overrideCursor() is not None:
                 QApplication.restoreOverrideCursor()
@@ -1998,8 +2024,7 @@ class OverlayWindow(QMainWindow):
                     self.raw_points = []
                     self.raw_pressures = []
                     self.drawing = False
-                    gc.enable()
-                    gc.collect(0)
+                    self._gc_safe_enable()
                     self.update()
                     return
 
@@ -2016,12 +2041,14 @@ class OverlayWindow(QMainWindow):
 
                 popped_oldest = False
                 if len(self.paths) >= self.MAX_STROKES:
-                    self.paths.pop(0)
+                    evicted_stroke = self.paths.pop(0)
                     popped_oldest = True
                     # Shift selected indices down by 1; remove any that pointed to the deleted stroke
                     self.selected_path_indices = [
                         idx - 1 for idx in self.selected_path_indices if idx > 0
                     ]
+                    # Prune undo history entries referencing the evicted stroke to prevent memory leak
+                    self._prune_undo_refs(evicted_stroke)
 
                 obb = QPolygonF(self.current_path.boundingRect())
                 stroke = {
@@ -2051,8 +2078,7 @@ class OverlayWindow(QMainWindow):
             self.current_pen = None
             
             # Re-enable GC and collect
-            gc.enable()
-            gc.collect(0)
+            self._gc_safe_enable()
 
     # ── Eraser ──
 
@@ -2063,6 +2089,44 @@ class OverlayWindow(QMainWindow):
         self.undo_history.append(action)
         if len(self.undo_history) > self.MAX_UNDO_STEPS:
             self.undo_history.pop(0)
+
+    def _prune_undo_refs(self, evicted_stroke):
+        """Remove undo history entries that reference an evicted stroke to prevent memory leak.
+        Entries of type 'add' holding only the evicted stroke are dropped entirely.
+        Entries of type 'delete', 'clear', 'transform', or 'recolor' have the evicted stroke
+        removed from their internal lists; the entry itself is dropped if it becomes empty."""
+        pruned = []
+        for action in self.undo_history:
+            atype = action.get('type')
+            if atype == 'add':
+                remaining = [s for s in action['strokes'] if s is not evicted_stroke]
+                if remaining:
+                    action['strokes'] = remaining
+                    pruned.append(action)
+                # else: drop this entry entirely
+            elif atype == 'delete':
+                remaining = [(idx, s) for idx, s in action['strokes'] if s is not evicted_stroke]
+                if remaining:
+                    action['strokes'] = remaining
+                    pruned.append(action)
+            elif atype == 'clear':
+                remaining = [s for s in action['strokes'] if s is not evicted_stroke]
+                if remaining:
+                    action['strokes'] = remaining
+                    pruned.append(action)
+            elif atype == 'transform':
+                remaining = [item for item in action['states'] if item.get('object') is not evicted_stroke]
+                if remaining:
+                    action['states'] = remaining
+                    pruned.append(action)
+            elif atype == 'recolor':
+                remaining = [item for item in action['items'] if item.get('object') is not evicted_stroke]
+                if remaining:
+                    action['items'] = remaining
+                    pruned.append(action)
+            else:
+                pruned.append(action)
+        self.undo_history = pruned
 
     def _finish_erase_action(self):
         snapshot = self._active_erase_snapshot
@@ -2281,13 +2345,14 @@ class OverlayWindow(QMainWindow):
                 painter.drawLine(QPointF(rot_center.x()+5, rot_center.y()), QPointF(rot_center.x()+8, rot_center.y()))
                 
                 # Draw delete handle circle
-                painter.setPen(QPen(QColor(220, 50, 50), 1.5))
-                painter.setBrush(QColor(255, 255, 255))
-                painter.drawEllipse(del_center, 10, 10)
-                
-                # Draw X inside
-                painter.drawLine(QPointF(del_center.x() - 4, del_center.y() - 4), QPointF(del_center.x() + 4, del_center.y() + 4))
-                painter.drawLine(QPointF(del_center.x() - 4, del_center.y() + 4), QPointF(del_center.x() + 4, del_center.y() - 4))
+                if not del_center.isNull():
+                    painter.setPen(QPen(QColor(220, 50, 50), 1.5))
+                    painter.setBrush(QColor(255, 255, 255))
+                    painter.drawEllipse(del_center, 10, 10)
+                    
+                    # Draw X inside
+                    painter.drawLine(QPointF(del_center.x() - 4, del_center.y() - 4), QPointF(del_center.x() + 4, del_center.y() + 4))
+                    painter.drawLine(QPointF(del_center.x() - 4, del_center.y() + 4), QPointF(del_center.x() + 4, del_center.y() - 4))
 
     def keyPressEvent(self, event):
         if event.key() == Qt.Key.Key_Escape:
@@ -2313,8 +2378,7 @@ class OverlayWindow(QMainWindow):
 
     def clear_screen(self):
         self._finish_erase_action()
-        if not gc.isenabled():
-            gc.enable()
+        self._gc_safe_enable()
         self._cancel_selection_interaction()
         if self.paths:
             self._record_undo({'type': 'clear', 'strokes': list(self.paths)})
@@ -2333,8 +2397,7 @@ class OverlayWindow(QMainWindow):
 
     def undo(self):
         self._finish_erase_action()
-        if not gc.isenabled():
-            gc.enable()
+        self._gc_safe_enable()
         self.drawing = False
         self.current_path = None
         self.current_pen = None
@@ -3009,7 +3072,10 @@ def setup_global_shortcuts(coordinator):
         'ctrl+b': execute_if_visible(signals.toggle_background.emit),
     }
     for combo, callback in hotkeys.items():
-        keyboard.add_hotkey(combo, callback, suppress=True)
+        try:
+            keyboard.add_hotkey(combo, callback, suppress=True)
+        except Exception as e:
+            print(f"Warning: Failed to register hotkey '{combo}': {e}")
 
 
 # ── App Coordinator ──
@@ -3327,4 +3393,6 @@ if __name__ == '__main__':
     coordinator = MainAppCoordinator()
     guard.wakeup.connect(coordinator.wakeup)
     app.aboutToQuit.connect(coordinator._quit_app)  # save settings on OS shutdown
+    # Safety net: ensure keyboard hooks are removed even on unhandled crash
+    atexit.register(keyboard.unhook_all)
     sys.exit(app.exec())
