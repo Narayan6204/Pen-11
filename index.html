@@ -104,11 +104,11 @@
         "operatingSystem": "Windows 10, Windows 11",
         "applicationCategory": "UtilitiesApplication",
         "applicationSubCategory": "Screen Annotation & Presentation Tool",
-        "description": "Ultra-lightweight, Direct3D 11 hardware-accelerated screen annotation and marker tool for Windows 11 with Smart Vector Objects, 60 FPS animations, and zero idle CPU usage.",
+        "description": "Ultra-lightweight, Direct3D 11 hardware-accelerated screen annotation and marker tool for Windows 11 with Native Win32 Hotkeys, Smart Vector Objects, 60 FPS animations, and zero idle CPU usage.",
         "url": "https://pen-11.pages.dev/",
         "downloadUrl": "https://github.com/Narayan6204/Pen-11/releases/latest",
-        "softwareVersion": "2.0.0",
-        "fileSize": "38.6MB",
+        "softwareVersion": "2.2.0",
+        "fileSize": "38.5MB",
         "license": "https://opensource.org/licenses/MIT",
         "isAccessibleForFree": true,
         "softwareRequirements": "Direct3D 11, Windows Desktop Window Manager (DWM)",
@@ -120,10 +120,12 @@
           "https://pen-11.pages.dev/assets/screenshot_cursor.png"
         ],
         "featureList": [
-          "Direct3D 11 hardware-accelerated rendering",
+          "Native Win32 RegisterHotKey engine with intelligent scoped shortcuts",
+          "Direct3D 11 hardware-accelerated Two-Layer Backing Cache",
           "60 FPS smooth Qt animation engine",
-          "Oriented Bounding Box (OBB) vector transformation",
-          "Modular floating color palette and shapes menu",
+          "Oriented Bounding Box (OBB) vector transformation and lasso",
+          "Dedicated Precision Shapes toolbox (Line, Arrow, Rectangle, Rounded Rect, Circle, Triangle)",
+          "Modular floating color palette and high-DPI Windows 11 system tray integration",
           "50,000-stroke memory-safe vector pipeline with 5,000-step undo stack",
           "Zero window focus stealing during presentations"
         ],
@@ -634,7 +636,7 @@
                 <div class="m3-badge-pill" style="align-self: flex-start; font-size: 11px;">Geometric Toolbox</div>
                 <h3 class="m3-title-medium">Smart Vector Shapes</h3>
                 <p class="m3-body-medium">
-                  Lines, Arrows, Rectangles, Rounded Rectangles, Ellipses, and Triangles with 45° angle snapping and 400ms gesture recognition.
+                  Lines, Arrows, Rectangles, Rounded Rectangles, Ellipses, and Triangles with Shift-constrained aspect ratios and 45° angle snapping.
                 </p>
               </div>
             </article>
@@ -736,7 +738,7 @@
               </div>
               <h3 class="bento-card-title">Smart Vector Objects & OBB</h3>
               <p class="bento-card-description">
-                Pure vector strokes track their Oriented Bounding Box geometry during centroid rotation, scaling, and dragging. Hold for 400ms to auto-snap strokes into perfect geometric shapes.
+                Pure vector strokes track their Oriented Bounding Box geometry during centroid rotation, scaling, and dragging with live vector transforms and pure freehand inking.
               </p>
             </article>
 
@@ -847,7 +849,7 @@
                 </li>
                 <li class="m3-flex-row m3-gap-xs m3-align-center" style="font-size: 13px; color: var(--md-sys-color-on-surface);">
                   <span class="material-symbols-rounded" style="font-size: 16px; color: #22c55e;">check_circle</span>
-                  <span>Hold 400ms to auto-snap geometric shapes</span>
+                  <span>Dedicated Precision Shapes toolbox</span>
                 </li>
                 <li class="m3-flex-row m3-gap-xs m3-align-center" style="font-size: 13px; color: var(--md-sys-color-on-surface);">
                   <span class="material-symbols-rounded" style="font-size: 16px; color: #22c55e;">check_circle</span>
@@ -867,7 +869,7 @@
                 </div>
                 <h3 class="bento-card-title">Business Presenters &amp; Streamers</h3>
                 <p class="bento-card-description" style="margin-bottom: 20px;">
-                  Guide audience focus during webinars and software demos using high-contrast translucent highlighters, auto-snapped arrows, and callouts. Collapse the toolbar to an unobtrusive pill (<kbd>Ctrl</kbd>+<kbd>5</kbd>) when recording clean screencasts or sharing screens on Zoom, Teams, and OBS.
+                  Guide audience focus during webinars and software demos using high-contrast translucent highlighters, precision arrows, and callouts. Collapse the toolbar to an unobtrusive pill (<kbd>Ctrl</kbd>+<kbd>5</kbd>) when recording clean screencasts or sharing screens on Zoom, Teams, and OBS.
                 </p>
               </div>
               <ul style="list-style: none; padding: 0; margin: 0; display: flex; flex-direction: column; gap: 8px; border-top: 1px solid var(--md-sys-color-outline-variant); padding-top: 16px;">
@@ -1023,8 +1025,8 @@
                   <td>None (bitmap-style clear/undo only)</td>
                 </tr>
                 <tr>
-                  <td><strong>Geometric Auto-Snap</strong></td>
-                  <td style="background-color: rgba(124, 92, 53, 0.05); font-weight: 600;">Hold 400ms for instant geometric snapping (lines, circles, etc.)</td>
+                  <td><strong>Geometric Shapes</strong></td>
+                  <td style="background-color: rgba(124, 92, 53, 0.05); font-weight: 600;">Dedicated Shapes Toolbox (Line, Arrow, Rectangle, Rounded Rect, Circle, Triangle) with Shift-constrain</td>
                   <td>Manual shapes locked behind paid Pro</td>
                   <td>Rudimentary shapes, no gesture detection</td>
                 </tr>
@@ -1069,7 +1071,7 @@
               Global Hotkey Matrix
             </h2>
             <p class="m3-body-large" style="">
-              System-wide keyboard shortcuts that operate anywhere across Windows 11. Test them in real-time or search below.
+              Native Win32 system-wide shortcuts with zero input lag, no low-level hook delays, and intelligent scoping that yields shortcuts back to your IDE and desktop apps when in Cursor mode.
             </p>
           </div>
 
