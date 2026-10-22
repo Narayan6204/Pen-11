@@ -295,11 +295,11 @@ class App {
       });
     }
 
-    // ── Bind Backdrop Switcher (Restricted in web sandbox) ──
+    // ── Bind Backdrop Switcher ──
     const backdropBtn = document.getElementById('tb-btn-bg');
     if (backdropBtn) {
       backdropBtn.addEventListener('click', () => {
-        this.showRestrictedToast();
+        this.cycleBackdrop();
       });
     }
 
@@ -540,6 +540,28 @@ class App {
       stage.classList.remove('canvas-backdrop-transparent', 'canvas-backdrop-whiteboard', 'canvas-backdrop-blackboard');
       stage.classList.add(`canvas-backdrop-${mode}`);
     }
+
+    const btn = document.getElementById('tb-btn-bg');
+    if (btn) {
+      const span = btn.querySelector('span');
+      if (mode === 'whiteboard') {
+        if (span) span.textContent = '⬛';
+        btn.title = 'Switch to Blackboard (Ctrl+B)';
+        btn.classList.add('active');
+        this.showToast('Switched to Whiteboard', 'crop_square');
+      } else if (mode === 'blackboard') {
+        if (span) span.textContent = '🖥️';
+        btn.title = 'Switch to Transparent Canvas (Ctrl+B)';
+        btn.classList.add('active');
+        this.showToast('Switched to Blackboard', 'square');
+      } else {
+        if (span) span.textContent = '⬜';
+        btn.title = 'Switch to Whiteboard (Ctrl+B)';
+        btn.classList.remove('active');
+        this.showToast('Switched to Transparent Canvas', 'desktop_windows');
+      }
+    }
+
     if (this.canvasEngine) {
       if (mode === 'transparent') {
         this.canvasEngine.options.backgroundColor = 'rgba(0,0,0,0.008)';
