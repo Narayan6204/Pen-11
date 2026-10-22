@@ -9,13 +9,21 @@ a = Analysis(
     hookspath=[],
     hooksconfig={},
     runtime_hooks=[],
-    excludes=['PyQt6.QtQml', 'PyQt6.QtQuick', 'PyQt6.QtQuick3D', 'PyQt6.QtPdf', 'PyQt6.QtMultimedia', 'PyQt6.QtBluetooth'],
+    excludes=[
+        'PyQt6.QtQml', 'PyQt6.QtQuick', 'PyQt6.QtQuick3D', 'PyQt6.QtPdf', 
+        'PyQt6.QtMultimedia', 'PyQt6.QtBluetooth', '_ssl', 'ssl'
+    ],
     noarchive=False,
     optimize=0,
 )
 
-# Exclude legacy Mesa software-rendered OpenGL (20.6 MB) - Pen 11 uses native Windows 11 Direct3D 11 GPU pipeline
-a.binaries = [x for x in a.binaries if not x[0].lower().endswith('opengl32sw.dll')]
+# Exclude legacy software OpenGL (20.6MB), unused OpenSSL (7.2MB), Qt6Pdf (4.4MB), and extra image plugins
+excluded_binaries = {
+    'opengl32sw.dll', 'qt6pdf.dll', 'libcrypto-3.dll', 'libssl-3.dll',
+    'qopensslbackend.dll', 'qschannelbackend.dll', 'qtiff.dll', 'qwebp.dll'
+}
+a.binaries = [x for x in a.binaries if not any(x[0].lower().endswith(b) for b in excluded_binaries)]
+a.datas = [x for x in a.datas if not (x[0].lower().endswith('.qm') or 'translations' in x[0].lower())]
 
 pyz = PYZ(a.pure)
 

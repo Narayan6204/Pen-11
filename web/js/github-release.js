@@ -20,10 +20,10 @@ const STATIC_FALLBACK = {
   directDownloadUrl: `https://github.com/${REPO_OWNER}/${REPO_NAME}/releases/download/v2.2.0/Pen.11.exe`,
   zipDownloadUrl: `https://github.com/${REPO_OWNER}/${REPO_NAME}/releases/download/v2.2.0/Pen-11-v2.2.0-Windows.zip`,
   assetName: 'Pen.11.exe',
-  assetSize: 30858921,
-  sizeFormatted: '30.8 MB',
-  zipSizeFormatted: '30.5 MB',
-  body: 'High-performance screen annotation for Windows 11 with native RegisterHotKey shortcuts, high-DPI system tray integration, and pure freehand tablet inking.',
+  assetSize: 23137279,
+  sizeFormatted: '22.1 MB',
+  zipSizeFormatted: '21.8 MB',
+  body: 'High-performance screen annotation for Windows 11 with native RegisterHotKey shortcuts, high-DPI system tray integration, smooth whiteboard transitions, and pure freehand tablet inking.',
   source: 'static_fallback'
 };
 
@@ -39,7 +39,7 @@ export const GDRIVE_CONFIG = {
  * @returns {string}
  */
 export function formatBytes(bytes) {
-  if (!bytes || isNaN(bytes)) return '30.8 MB';
+  if (!bytes || isNaN(bytes)) return '22.1 MB';
   const units = ['B', 'KB', 'MB', 'GB'];
   let i = 0;
   let size = bytes;

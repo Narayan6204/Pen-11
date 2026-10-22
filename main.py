@@ -80,7 +80,7 @@ from PyQt6.QtWidgets import (
 )
 from PyQt6.QtCore import (
     Qt, QPoint, QRect, QRectF, pyqtSignal, QObject, QTimer, QPointF,
-    QPropertyAnimation, QEasingCurve, QSize, QEvent, QAbstractNativeEventFilter
+    QPropertyAnimation, QVariantAnimation, QEasingCurve, QSize, QEvent, QAbstractNativeEventFilter
 )
 from PyQt6.QtGui import (
     QPainter, QPen, QColor, QPainterPath, QPainterPathStroker, QPixmap,
@@ -178,6 +178,7 @@ class ShortcutSignals(QObject):
     undo                = pyqtSignal()
     change_color        = pyqtSignal(str)
     toggle_background   = pyqtSignal()
+    background_changed  = pyqtSignal(int)
     toggle_visibility   = pyqtSignal()
     visibility_changed  = pyqtSignal(bool)
     exit_app            = pyqtSignal()
@@ -318,21 +319,29 @@ class FadeTooltip(QWidget):
 def _install_fade_tooltip(widget, text):
     """Attach FadeTooltip enter/leave/click/hide to a widget, disabling the blinking system tooltip.
     Chains the original Qt event handlers so native hover styling is preserved.
+    Supports dynamic text updates when called again on the same widget.
     """
     widget.setToolTip("")  # suppress the flickering native tooltip
+    widget._fade_tooltip_text = text
+
+    if getattr(widget, '_fade_tooltip_installed', False):
+        return
+    widget._fade_tooltip_installed = True
 
     orig_enter = widget.enterEvent
     orig_leave = widget.leaveEvent
     orig_press = widget.mousePressEvent
     orig_hide = widget.hideEvent
 
-    def _enter(event, _t=text):
+    def _enter(event):
+        _t = getattr(widget, '_fade_tooltip_text', '')
         FadeTooltip.instance().schedule_show(_t, QCursor.pos())
         orig_enter(event)  # preserve Qt hover highlight
 
-    def _leave(event, _t=text):
+    def _leave(event):
         # Only cancel if THIS button's tooltip is still pending/visible (race-condition fix)
         tip = FadeTooltip.instance()
+        _t = getattr(widget, '_fade_tooltip_text', '')
         if tip._pending_text == _t:
             tip.cancel()
         orig_leave(event)  # preserve Qt hover highlight
@@ -342,8 +351,9 @@ def _install_fade_tooltip(widget, text):
         FadeTooltip.instance().hide_immediately()
         orig_press(event)
 
-    def _hide(event, _t=text):
+    def _hide(event):
         tip = FadeTooltip.instance()
+        _t = getattr(widget, '_fade_tooltip_text', '')
         if tip._pending_text == _t:
             tip.hide_immediately()
         orig_hide(event)
@@ -856,12 +866,25 @@ class OverlayWindow(QMainWindow):
         super().__init__()
         self.signals = signals
 
-        # Tool state
+        # Tool and background state
         self.mode = ToolMode.PEN
         self.bg_mode = BackgroundMode.TRANSPARENT
         self.is_click_through = False
         self.ink_visible = True
         self.current_shape = ShapeType.LINE
+
+        # Background color definitions & hardware-accelerated cross-fade animation
+        self._bg_colors = {
+            BackgroundMode.TRANSPARENT: QColor(0, 0, 0, 2),
+            BackgroundMode.WHITEBOARD: QColor(255, 255, 255, 255),
+            BackgroundMode.BLACKBOARD: QColor(34, 34, 34, 255)
+        }
+        self._current_bg_color = QColor(0, 0, 0, 2)
+        self._bg_anim = QVariantAnimation(self)
+        self._bg_anim.setDuration(220)
+        self._bg_anim.setEasingCurve(QEasingCurve.Type.InOutCubic)
+        self._bg_anim.valueChanged.connect(self._on_bg_anim_step)
+        self._bg_anim.finished.connect(self._on_bg_anim_finished)
 
         # Colors and sizes
         self.pen_color = QColor(COLORS[0])
@@ -962,7 +985,7 @@ class OverlayWindow(QMainWindow):
     def _sync_scoped_hotkeys(self):
         """Synchronize Win32 scoped hotkeys with active tool mode and ink visibility."""
         if hasattr(self, 'hotkey_mgr') and self.hotkey_mgr:
-            scoped = bool(self.ink_visible and self.mode != ToolMode.CURSOR)
+            scoped = bool((self.ink_visible and self.mode != ToolMode.CURSOR) or self.bg_mode != BackgroundMode.TRANSPARENT)
             self.hotkey_mgr.set_scoped_enabled(scoped)
 
     # ── GC safety ──
@@ -1176,9 +1199,43 @@ class OverlayWindow(QMainWindow):
             self.pen_color = QColor(hex_color)
         self._update_cursor()
 
-    def toggle_background(self):
-        self.bg_mode = (self.bg_mode + 1) % 3
+    def _on_bg_anim_step(self, color):
+        self._current_bg_color = color
         self.update()
+
+    def _on_bg_anim_finished(self):
+        target_color = self._bg_colors.get(self.bg_mode, QColor(0, 0, 0, 2))
+        self._current_bg_color = target_color
+        self.update()
+
+    def toggle_background(self):
+        next_mode = (self.bg_mode + 1) % 3
+
+        # Auto-recover drawing interaction if entering Whiteboard or Blackboard
+        if next_mode != BackgroundMode.TRANSPARENT:
+            if not self.ink_visible:
+                self.ink_visible = True
+                self.signals.visibility_changed.emit(True)
+            if self.mode == ToolMode.CURSOR:
+                self.set_mode(ToolMode.PEN)
+            else:
+                self.set_click_through(False)
+        else:
+            self.set_click_through(not self.ink_visible or self.mode == ToolMode.CURSOR)
+
+        self.bg_mode = next_mode
+        self.signals.background_changed.emit(self.bg_mode)
+        self._sync_scoped_hotkeys()
+
+        # Trigger smooth 220ms cross-fade animation
+        start_color = QColor(self._current_bg_color)
+        target_color = self._bg_colors[self.bg_mode]
+
+        self._bg_anim.stop()
+        self._bg_anim.setStartValue(start_color)
+        self._bg_anim.setEndValue(target_color)
+        self._bg_anim.start()
+
 
     def toggle_visibility(self):
         # Safety: if user hides mid-stroke, restore blank cursor and GC
@@ -2328,10 +2385,8 @@ class OverlayWindow(QMainWindow):
 
     def paintEvent(self, event):
         painter = QPainter(self)
-        if self.bg_mode == BackgroundMode.WHITEBOARD:
-            painter.fillRect(event.rect(), QColor("white"))
-        elif self.bg_mode == BackgroundMode.BLACKBOARD:
-            painter.fillRect(event.rect(), QColor("#222222"))
+        if getattr(self, '_current_bg_color', None) and self._current_bg_color.alpha() > 0:
+            painter.fillRect(event.rect(), self._current_bg_color)
         else:
             painter.fillRect(event.rect(), QColor(0, 0, 0, 2))
 
@@ -2607,6 +2662,7 @@ TOOLBAR_STYLESHEET = """
     QPushButton:hover { background-color: #D6C3A1; }
     QPushButton:pressed { background-color: #C6B18D; }
     QPushButton#activeTool { background-color: #B5A07A; border: 2px solid #555555; }
+    QPushButton#activeBg { background-color: #B5A07A; border: 2px solid #555555; }
     QToolTip {
         background-color: #333333; color: white;
         border: 1px solid #555; border-radius: 4px; padding: 4px; font-size: 12px;
@@ -2748,8 +2804,27 @@ class ToolbarWindow(QWidget):
         self.signals.switch_cursor.connect(lambda: self._set_active_tool(self.btn_cursor, None))
         self.signals.change_pen_size.connect(lambda _: self._set_active_tool(self.btn_pen, None))
         self.signals.change_highlighter_size.connect(lambda _: self._set_active_tool(self.btn_hl, None))
-        self.signals.change_eraser_size.connect(lambda _: self._set_active_tool(self.btn_eraser, None))
         self.signals.visibility_changed.connect(self._on_visibility_changed)
+        self.signals.background_changed.connect(self._on_background_changed)
+
+    def _on_background_changed(self, mode):
+        if not hasattr(self, 'btn_bg') or self.btn_bg is None:
+            return
+        if mode == BackgroundMode.WHITEBOARD:
+            self.btn_bg.setText("⬛")
+            _install_fade_tooltip(self.btn_bg, "Switch to Blackboard (Ctrl+B)")
+            self.btn_bg.setObjectName("activeBg")
+        elif mode == BackgroundMode.BLACKBOARD:
+            self.btn_bg.setText("🖥️")
+            _install_fade_tooltip(self.btn_bg, "Switch to Transparent Canvas (Ctrl+B)")
+            self.btn_bg.setObjectName("activeBg")
+        else:
+            self.btn_bg.setText("⬜")
+            _install_fade_tooltip(self.btn_bg, "Switch to Whiteboard (Ctrl+B)")
+            self.btn_bg.setObjectName("")
+        self.btn_bg.style().unpolish(self.btn_bg)
+        self.btn_bg.style().polish(self.btn_bg)
+
 
     def _on_visibility_changed(self, visible):
         self.ink_visible = visible
@@ -2788,6 +2863,7 @@ class ToolbarWindow(QWidget):
 
     def _create_tool_button(self, icon, tooltip, callback):
         btn = QPushButton()
+        btn.setFocusPolicy(Qt.FocusPolicy.NoFocus)
         btn.setText(icon)
         btn.setFixedSize(36, 36)
         btn.setCursor(Qt.CursorShape.PointingHandCursor)
@@ -2799,6 +2875,7 @@ class ToolbarWindow(QWidget):
 
     def _create_hold_button(self, icon, tooltip, callback):
         btn = HoldButton(icon, tooltip)
+        btn.setFocusPolicy(Qt.FocusPolicy.NoFocus)
         btn.setFixedSize(36, 36)
         btn.setCursor(Qt.CursorShape.PointingHandCursor)
         btn.setMouseTracking(True)
@@ -2809,6 +2886,7 @@ class ToolbarWindow(QWidget):
 
     def _create_click_button(self, icon, tooltip):
         btn = ClickMenuButton(icon, tooltip)
+        btn.setFocusPolicy(Qt.FocusPolicy.NoFocus)
         btn.setFixedSize(36, 36)
         btn.setCursor(Qt.CursorShape.PointingHandCursor)
         btn.setMouseTracking(True)
@@ -2903,6 +2981,7 @@ class ToolbarWindow(QWidget):
 
     def _add_button(self, layout, icon, tooltip, callback):
         btn = QPushButton()
+        btn.setFocusPolicy(Qt.FocusPolicy.NoFocus)
         btn.setText(icon)
         btn.setFixedSize(36, 36)
         btn.setCursor(Qt.CursorShape.PointingHandCursor)
@@ -3249,7 +3328,7 @@ def setup_global_shortcuts(coordinator):
     coordinator.overlay.hotkey_mgr = mgr
     
     # Initial state sync
-    init_scoped = getattr(coordinator.overlay, 'ink_visible', True) and getattr(coordinator.overlay, 'mode', None) != ToolMode.CURSOR
+    init_scoped = (getattr(coordinator.overlay, 'ink_visible', True) and getattr(coordinator.overlay, 'mode', None) != ToolMode.CURSOR) or getattr(coordinator.overlay, 'bg_mode', 0) != BackgroundMode.TRANSPARENT
     mgr.set_scoped_enabled(init_scoped)
 
 
