@@ -10,6 +10,8 @@ A high-performance, lightweight, and completely free screen annotation tool buil
 
 🌐 **Try it in your browser:** Test the vector drawing engine without downloading anything on our [Live Web Demo](https://pen-11.pages.dev/).
 
+🧭 **Developer reference:** See the [Pen 11 Product, Architecture & Extension Guide](docs/PEN11_NOTION_GUIDE.md) for a Notion-ready explanation of features, runtime flow, customization points, persistence, testing, and feature-development checklists.
+
 <p align="center">
   <img src="assets/screenshot_palette.png" alt="Pen 11 Toolbar & Color Palette" height="400" style="margin: 0 28px;">
   &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
@@ -70,7 +72,7 @@ How does Pen 11 compare against traditional desktop screen markers?
 * **Zero Window Focus Stealing:** Engineered with `Qt.WindowDoesNotAcceptFocus` and Windows `WS_EX_NOACTIVATE` flags—hovering over toolbar buttons never steals window focus from typing, slide presentations, or coding IDEs.
 
 ### 🎬 60 FPS Fluid Animation Suite
-* **Smooth Toolbar Collapse / Expand:** Toggle ink visibility (`Ctrl+5`) and watch the toolbar glide into a compact floating pill handle via cubic easing curves (`InOutCubic`, `240ms`) with zero layout flicker.
+* **Smooth Toolbar Collapse / Expand:** Toggle ink visibility (`Ctrl+Shift+2`) and watch the toolbar glide into a compact floating pill handle via cubic easing curves (`InOutCubic`, `240ms`) with zero layout flicker.
 * **Non-Blocking Opacity Fades:** Floating sub-panels (Palette, Shapes, Cursors) fade in and out (`InOutSine`). Rapid clicks dynamically reverse animation from current opacity, avoiding visual snapping.
 
 ### 🪟 Independent Floating Sub-Toolbars
@@ -99,7 +101,7 @@ How does Pen 11 compare against traditional desktop screen markers?
 * **💻 Developers & Designers:**
   Highlight lines of code during pull request reviews, sketch architecture and data-flow diagrams during live pair programming, and circle bugs directly over running applications without stealing window focus. Group, rotate, and scale strokes with pure vector Oriented Bounding Box (OBB) selection.
 * **🎤 Business Presenters & Streamers:**
-  Guide audience focus during webinars and software demos using highlighters, precision arrows, and callouts. Collapse the toolbar to an unobtrusive pill (`Ctrl+5`) when recording clean screencasts or sharing screens on Zoom, Teams, and OBS.
+  Guide audience focus during webinars and software demos using highlighters, precision arrows, and callouts. Collapse the toolbar to an unobtrusive pill (`Ctrl+Shift+2`) when recording clean screencasts or sharing screens on Zoom, Teams, and OBS.
 
 ---
 
@@ -109,7 +111,10 @@ Get up and running in under 30 seconds:
 
 1. **Download & Launch:** Grab the standalone `Pen 11.exe` from the [Releases](https://github.com/Narayan6204/Pen-11/releases/latest) page. Double-click to launch immediately—no installation wizard, administrator rights, or background services required.
 2. **Start Drawing (`Ctrl+1`):** Use your mouse or graphics tablet to annotate anywhere. Press `Ctrl+1` for Pen, `Ctrl+2` for Highlighter, or `Ctrl+3` for Eraser.
-3. **Toggle & Present (`Ctrl+5`):** Press `Ctrl+5` to toggle ink visibility and collapse the toolbar into an unobtrusive floating pill handle for clean presentations. Press `Ctrl+Shift+C` whenever you want to wipe the canvas clean.
+3. **Toggle & Present (`Ctrl+Shift+2`):** Press `Ctrl+Shift+2` to toggle ink visibility and collapse the toolbar into an unobtrusive floating pill handle for clean presentations. Press `Ctrl+Shift+C` whenever you want to wipe the canvas clean.
+
+Tool sizes are bounded for predictable rendering: Pen **1–30 px**, Highlighter
+**5–80 px**, and Eraser **10–100 px**.
 
 ---
 
@@ -120,8 +125,9 @@ Get up and running in under 30 seconds:
 | `Ctrl` + `1` | Select **Pen Tool** (100% pure freehand vector inking) |
 | `Ctrl` + `2` | Select **Highlighter Tool** |
 | `Ctrl` + `3` | Select **Eraser Tool** |
-| `Ctrl` + `4` | Select **Cursor / Selection Mode** (Lasso & Transform) |
-| `Ctrl` + `5` | Toggle **Ink Visibility** (Collapses / Expands Toolbar) |
+| `Ctrl` + `Alt` + `S` | Select **Selection Mode** (select and transform annotations) |
+| `Ctrl` + `Shift` + `1` | Toggle **Cursor mode** while preserving visible drawings |
+| `Ctrl` + `Shift` + `2` | Toggle **Ink Visibility** (Collapses / Expands Toolbar) |
 | `Ctrl` + `Z` | **Undo** last stroke (up to 5,000 steps) |
 | `Ctrl` + `Shift` + `C` | **Clear Screen** (Wipes all annotations) |
 | `Ctrl` + `]` | **Increase** Active Tool Size |
@@ -135,7 +141,7 @@ Get up and running in under 30 seconds:
 | **Long-Press Tool** | Opens instant quick-size radial selector |
 | **Shapes Toolbox** | Draw Line, Arrow, Rectangle, Rounded Rect, Circle, Triangle |
 
-> 💡 **Intelligent Hotkey Scoping:** Inking shortcuts (`Ctrl+Z`, `Ctrl+P`, `Ctrl+B`, `Ctrl+]`, `Ctrl+[`) are automatically unhooked when the canvas is hidden (`Ctrl+5`) or when in Cursor Mode (`Ctrl+4`), so all your favorite shortcuts in VS Code, Word, Chrome, and Photoshop continue working seamlessly without conflict.
+> 💡 **Intelligent Hotkey Scoping:** Inking shortcuts (`Ctrl+Z`, `Ctrl+P`, `Ctrl+B`, `Ctrl+]`, `Ctrl+[`) are automatically unhooked when the canvas is hidden (`Ctrl+Shift+2`) or when in Cursor Mode (`Ctrl+Shift+1`), so all your favorite shortcuts in VS Code, Word, Chrome, and Photoshop continue working seamlessly without conflict.
 
 ---
 
