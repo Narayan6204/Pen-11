@@ -58,7 +58,7 @@ class App {
     // 7. Initialize Download Preference Modal
     this._initDownloadModal();
 
-    console.log('Pen 11 Web Experience Initialized with Exact Desktop UI & Shortcuts.');
+    console.log('Pen 11 Web Experience Initialized with desktop-aligned shortcuts.');
   }
 
   // ==========================================================================
@@ -506,7 +506,7 @@ class App {
       this.monkeyState = 'active';
       if (monkeyIcon) monkeyIcon.textContent = '🐵';
       if (monkeyBtn) monkeyBtn.title = 'Active Ink Mode (Click to switch to Cursor)';
-      this.showToast('Canvas Visible (Ctrl+5)', 'visibility');
+      this.showToast('Canvas Visible (Ctrl+Shift+2)', 'visibility');
     } else {
       if (toolbar) toolbar.classList.add('collapsed');
       if (canvasContainer) canvasContainer.style.display = 'none';
@@ -514,7 +514,7 @@ class App {
       this.monkeyState = 'hidden';
       if (monkeyIcon) monkeyIcon.textContent = '🙈';
       if (monkeyBtn) monkeyBtn.title = 'Canvas Hidden (Click to unhide)';
-      this.showToast('Canvas Hidden & Toolbar Collapsed (Ctrl+5)', 'visibility_off');
+      this.showToast('Canvas Hidden & Toolbar Collapsed (Ctrl+Shift+2)', 'visibility_off');
     }
   }
 
