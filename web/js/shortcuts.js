@@ -1,8 +1,7 @@
 /**
  * shortcuts.js
  * Pen 11 Keyboard Shortcuts & Interactive Matrix Search Engine.
- * Handles the 14 exact global key bindings from main.py
- * (Ctrl+1..5, Ctrl+Z, Ctrl+Shift+C, Ctrl+P, Ctrl+B, Ctrl+], Ctrl+[, Ctrl+Q, Delete/Backspace, Shift+Drag)
+ * Handles the desktop shortcut reference in main.py plus browser-demo equivalents.
  * and powers the dynamic Hotkey Matrix search and category filter table.
  */
 
@@ -30,16 +29,23 @@ export const SHORTCUTS_DATA = [
   },
   {
     category: 'Selection & Smart Objects',
-    action: 'Select / Cursor Mode',
-    keys: ['Ctrl', '4'],
-    description: 'Enables cursor click-through mode, lasso circle-to-select, and OBB transformation.',
+    action: 'Selection Mode',
+    keys: ['Ctrl', 'Alt', 'S'],
+    description: 'Activates lasso selection and OBB move, rotate, scale, recolor, and delete controls.',
     toolId: 'select'
   },
   {
     category: 'Canvas Controls',
+    action: 'Toggle Cursor Mode',
+    keys: ['Ctrl', 'Shift', '1'],
+    description: 'Toggles click-through Cursor mode while preserving existing drawings.',
+    actionId: 'toggle-cursor'
+  },
+  {
+    category: 'Canvas Controls',
     action: 'Toggle Canvas Visibility',
-    keys: ['Ctrl', '5'],
-    description: 'Collapses toolbar to minimal pill (🙈) and temporarily hides ink without clearing.',
+    keys: ['Ctrl', 'Shift', '2'],
+    description: 'Collapses the toolbar and hides or shows ink without clearing it.',
     actionId: 'toggle-visibility'
   },
   {
@@ -157,15 +163,20 @@ export class ShortcutsManager {
       e.preventDefault();
       this.triggerTool('eraser', 'Eraser (Ctrl+3)');
     }
-    // Ctrl + 4: Cursor / Select
-    else if (isCtrl && !isShift && (key === '4' || code === 'Digit4' || code === 'Numpad4')) {
+    // Ctrl + Alt + S: Selection Mode
+    else if (isCtrl && e.altKey && (key === 's' || key === 'S' || code === 'KeyS')) {
       e.preventDefault();
-      this.triggerTool('select', 'Select / Cursor (Ctrl+4)');
+      this.triggerTool('select', 'Selection Mode (Ctrl+Alt+S)');
     }
-    // Ctrl + 5: Toggle Canvas Visibility
-    else if (isCtrl && !isShift && (key === '5' || code === 'Digit5' || code === 'Numpad5')) {
+    // Ctrl + Shift + 1: Toggle Cursor Mode
+    else if (isCtrl && isShift && (key === '1' || code === 'Digit1' || code === 'Numpad1')) {
       e.preventDefault();
-      this.triggerAction('toggle-visibility', 'Toggled Canvas Visibility (Ctrl+5)');
+      this.triggerAction('toggle-cursor', 'Toggled Cursor Mode (Ctrl+Shift+1)');
+    }
+    // Ctrl + Shift + 2: Toggle Canvas Visibility
+    else if (isCtrl && isShift && (key === '2' || code === 'Digit2' || code === 'Numpad2')) {
+      e.preventDefault();
+      this.triggerAction('toggle-visibility', 'Toggled Canvas Visibility (Ctrl+Shift+2)');
     }
     // Ctrl + Shift + Z or Ctrl + Y: Redo
     else if ((isCtrl && isShift && (key === 'z' || key === 'Z' || code === 'KeyZ')) || (isCtrl && !isShift && (key === 'y' || key === 'Y' || code === 'KeyY'))) {
@@ -264,6 +275,13 @@ export class ShortcutsManager {
           ctx.toggleCanvasVisibility();
           return; // Toast handled by callback
         }
+        break;
+      case 'toggle-cursor':
+        if (ctx.showRestrictedToast) {
+          ctx.showRestrictedToast();
+          return;
+        }
+        feedbackMessage = 'Cursor Mode is available in the Windows desktop app';
         break;
       case 'size-increase':
         if (ctx.toolManager) {
