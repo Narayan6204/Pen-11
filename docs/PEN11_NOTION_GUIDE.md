@@ -79,9 +79,8 @@ The most important rule for future work is:
 - Tooltips that fade without stealing focus.
 - Temporary size feedback badge showing the active tool and pixel size after
   keyboard or quick-menu size changes.
-- The shape toolbox remembers its detached position. The color palette is
-  intentionally temporary: dragging affects only the current open session, and
-  closing/reopening docks it beside the toolbar.
+- The toolbar position persists. Shapes toolbox and color palette positions are
+  session-only; closing/reopening the color palette docks it beside the toolbar.
 
 ### Windows integration and performance
 

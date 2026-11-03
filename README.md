@@ -77,7 +77,7 @@ How does Pen 11 compare against traditional desktop screen markers?
 
 ### 🪟 Independent Floating Sub-Toolbars
 * **Modular Floating Panels:** Palette, Shapes Menu, and Cursor Toolbars can be independently dragged and placed anywhere across your desktop.
-* **Smart Drag Synchronization:** Dragging the main toolbar naturally pulls attached flyouts along. The toolbar and Shapes toolbox positions persist; the Color Palette docks beside the toolbar on each reopen.
+* **Smart Drag Synchronization:** Dragging the main toolbar naturally pulls attached flyouts along. The toolbar position persists; Shapes and Color Palette positions are session-only, and the Color Palette docks beside the toolbar on each reopen.
 * **Auto-Dismiss on Tool Switch:** Selecting a drawing tool cleanly dismisses transient menus while keeping your favorite color palette open.
 
 ### 📐 Smart Objects & Pure Vector Selection
@@ -135,7 +135,7 @@ Tool sizes are bounded for predictable rendering: Pen **1–30 px**, Highlighter
 | `Ctrl` + `P` | Toggle **Color Palette** |
 | `Ctrl` + `B` | Cycle **Whiteboard / Blackboard / Transparent Mode** |
 | `Ctrl` + `Q` | **Exit Application** |
-| `Ctrl` + mouse wheel | Scroll the underlying app while a drawing tool is active; drawing takes priority while the left button is held |
+| `Ctrl` or `Alt` + mouse wheel | Scroll the underlying app while a drawing tool is active; drawing takes priority while the left button is held |
 | `Delete` / `Backspace` | Delete selected shape or stroke (in Selection Mode) |
 | `Shift` + `Draw` | Constrain to 1:1 aspect ratio (Square/Circle) or 45° line angle |
 | **Long-Press Tool** | Opens instant quick-size radial selector |
@@ -164,7 +164,7 @@ Pen 11 is 100% portable:
   ```
 
 ### 4. Can I draw over fullscreen applications, games, and presentation slideshows?
-Yes. Pen 11 creates a transparent, click-through capable Direct3D overlay with non-activating window flags (`Qt.WindowDoesNotAcceptFocus` / `WS_EX_NOACTIVATE`). It draws smoothly over PowerPoint/Keynote slideshows, PDF readers, browser tabs, and desktop applications. For video games, run the game in **Borderless Windowed** mode to allow Windows desktop overlays to render on top.
+Yes. Pen 11 creates a transparent, click-through capable Windows desktop overlay with non-activating window flags (`Qt.WindowDoesNotAcceptFocus` / `WS_EX_NOACTIVATE`). It can draw over PowerPoint slideshows, PDF readers, browser tabs, and other Windows desktop applications. For video games, run the game in **Borderless Windowed** mode to allow Windows desktop overlays to render on top.
 
 ### 5. How does Pen 11 manage drawing and undo history?
 Completed strokes are incrementally baked into a high-DPI backing cache, while selected objects remain vector data during transforms. The desktop app limits undo history to 5,000 entries and drawing paths to 50,000 paths to keep resource use bounded. Actual performance depends on display size, hardware, and the complexity of the drawing.
