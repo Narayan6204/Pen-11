@@ -111,7 +111,7 @@
         "fileSize": "24.5MB",
         "license": "https://opensource.org/licenses/MIT",
         "isAccessibleForFree": true,
-        "softwareRequirements": "Direct3D 11, Windows Desktop Window Manager (DWM)",
+        "softwareRequirements": "Windows 10 or Windows 11 desktop environment",
         "image": "https://pen-11.pages.dev/assets/screenshot.png",
         "screenshot": [
           "https://pen-11.pages.dev/assets/screenshot.png",
@@ -121,14 +121,14 @@
         ],
         "featureList": [
           "Native Win32 RegisterHotKey engine with intelligent scoped shortcuts",
-          "Direct3D 11 hardware-accelerated Two-Layer Backing Cache",
-          "60 FPS smooth Qt animation engine",
+          "Incremental high-DPI backing cache with live vector selection",
+          "Animated Qt toolbar transitions",
           "Oriented Bounding Box (OBB) vector transformation and lasso",
           "Dedicated Precision Shapes toolbox (Line, Arrow, Rectangle, Rounded Rect, Circle, Triangle)",
           "Modular floating color palette, temporary size feedback, and high-DPI Windows 11 system tray integration",
           "Bounded Pen, Highlighter, and Eraser sizes for predictable rendering",
           "Dedicated Selection Mode for lasso, move, rotate, scale, recolor, and delete",
-          "50,000-stroke memory-safe vector pipeline with 5,000-step undo stack",
+          "Incremental drawing cache with bounded 50,000-path and 5,000-entry history limits",
           "Zero window focus stealing during presentations"
         ],
         "offers": {
@@ -152,7 +152,7 @@
             "name": "Which graphics tablets, styluses, and digital pens are supported?",
             "acceptedAnswer": {
               "@type": "Answer",
-              "text": "Pen 11 provides native, hardware-level support for any tablet or stylus compatible with Windows Ink / Wintab, including Wacom (Intuos, One, Cintiq), Huion, XP-Pen, Gaomon, and Microsoft Surface Pen. The app reads raw hardware pressure values via tabletEvent() for smooth, natural stroke tapering and automatically detects when you flip your stylus over (PointerType.Eraser) to erase without touching the toolbar."
+              "text": "Pen 11 accepts mouse and tablet/stylus input through the PyQt6 input path. Pressure-sensitive input and stylus eraser behavior depend on the device and Windows driver."
             }
           },
           {
@@ -160,7 +160,7 @@
             "name": "How does multi-monitor support work across different display resolutions?",
             "acceptedAnswer": {
               "@type": "Answer",
-              "text": "Pen 11 is multi-monitor native: its drawing canvas spans your entire virtual desktop across all connected monitors, whether 1080p, 2K, 4K, or mixed DPI. Its smart positioning engine (_smart_position()) detects screen boundaries using QApplication.screenAt() and automatically flips flyout panels horizontally or vertically so palettes and menus never clip off-screen or slip under the Windows Taskbar."
+              "text": "Pen 11 supports virtual desktop geometry and multi-monitor screen changes. Floating panels use available screen geometry to keep their placement within display boundaries."
             }
           },
           {
@@ -184,7 +184,7 @@
             "name": "Will Pen 11 lag during long drawing sessions or complex diagrams?",
             "acceptedAnswer": {
               "@type": "Answer",
-              "text": "No. Unlike traditional tools that redraw every single vector point from scratch on every frame, Pen 11 uses a Two-Layer Accelerated Backing Cache: completed strokes are permanently rasterized into a high-DPI Direct3D 11 off-screen buffer. You can ink 50,000+ strokes without dropping below 60 FPS or experiencing stroke accumulation lag."
+              "text": "Pen 11 incrementally bakes completed strokes into a high-DPI backing cache and keeps selected objects available for vector transforms. The desktop app bounds drawing paths at 50,000 and undo history at 5,000 entries. Actual performance depends on display size, hardware, and drawing complexity."
             }
           },
           {
@@ -200,7 +200,7 @@
             "name": "Does Pen 11 require an installer or administrator rights?",
             "acceptedAnswer": {
               "@type": "Answer",
-              "text": "No installation required. Pen 11 is shipped as a standalone portable Pen.11.exe and compressed .ZIP archive. You can download and run it directly from your Downloads folder, Desktop, or USB drive without administrator privileges."
+              "text": "No installation wizard is required. Pen 11 is shipped as a standalone Windows executable and compressed ZIP archive. You can download and run it directly from your Downloads folder, Desktop, or USB drive; administrator requirements can depend on the Windows environment."
             }
           },
           {
@@ -208,7 +208,7 @@
             "name": "How does Pen 11 achieve zero idle CPU usage?",
             "acceptedAnswer": {
               "@type": "Answer",
-              "text": "Unlike web/Electron-based tools that run heavy Chromium background loops, Pen 11 is built on native Direct3D 11 and Qt bindings. When you are not drawing, its event loop sleeps at 0.0% CPU and renders only modified dirty rects during active mouse/stylus strokes."
+              "text": "Pen 11 is a native PyQt6 desktop application with an event-driven idle loop and incremental backing cache. Resource use depends on display configuration, hardware, graphics drivers, and drawing complexity."
             }
           }
         ]
@@ -284,7 +284,7 @@
           <div class="m3-flex-col m3-align-center" style="text-align: center; max-width: 900px; margin: 0 auto 36px;">
             <div class="m3-badge-pill" style="margin-bottom: 16px;">
               <span class="material-symbols-rounded" style="font-size: 16px;">bolt</span>
-              <span>Direct3D 11 GPU Pipeline • 60 FPS Fluid Animations • <span data-gh-version>v2.2.0</span></span>
+              <span>Native PyQt6 Overlay • Cached Rendering • <span data-gh-version>v2.2.0</span></span>
             </div>
 
             <h1 id="hero-title" class="m3-display-medium" style="margin-bottom: 16px; font-weight: 800;">
@@ -340,7 +340,7 @@
                   <span class="material-symbols-rounded sys-req-icon">speed</span>
                   <div class="sys-req-text">
                     <span class="sys-req-label">Graphics (GPU)</span>
-                    <span class="sys-req-val">Direct3D 11 <span style="font-size: 11px; font-weight: normal; opacity: 0.85;">(Hardware DWM)</span></span>
+                    <span class="sys-req-val">Windows-compatible Qt graphics stack</span>
                   </div>
                 </div>
 
@@ -497,7 +497,7 @@
             <div class="canvas-hud-bottom-left">
               <div class="hud-pill">
                 <div class="hud-pill-dot"></div>
-                <span>Direct3D 11 • 60 FPS • Smart Objects</span>
+                <span>Native Overlay • Animated UI • Smart Objects</span>
               </div>
             </div>
 
@@ -541,7 +541,7 @@
                 </div>
                 <h3 class="bento-card-title">Download &amp; Launch</h3>
                 <p class="bento-card-description" style="margin-bottom: 16px;">
-                  Download the portable standalone <code class="m3-kbd">Pen 11.exe</code> (<span data-gh-size>24.5 MB</span>). Double-click to launch immediately—runs 100% locally with zero background services.
+                  Download the portable standalone Windows executable (<span data-gh-size>24.5 MB</span>). Double-click to launch immediately; the app runs locally without a separate installer.
                 </p>
               </div>
               <div style="margin-top: 12px;">
@@ -563,7 +563,7 @@
                 </div>
                 <h3 class="bento-card-title">Draw with Ctrl+1</h3>
                 <p class="bento-card-description" style="margin-bottom: 16px;">
-                  Switch seamlessly between the primary <strong>desktop pen tool</strong> (<kbd>Ctrl</kbd>+<kbd>1</kbd>) and translucent <strong>screen highlighter</strong> (<kbd>Ctrl</kbd>+<kbd>2</kbd>). Annotate, sketch, or highlight directly over PowerPoint slides, code editors, or browser tabs with zero window focus stealing and Direct3D 11 sub-millisecond response.
+                  Switch seamlessly between the primary <strong>desktop pen tool</strong> (<kbd>Ctrl</kbd>+<kbd>1</kbd>) and translucent <strong>screen highlighter</strong> (<kbd>Ctrl</kbd>+<kbd>2</kbd>). Annotate, sketch, or highlight directly over PowerPoint slides, code editors, or browser tabs while preserving the underlying window focus.
                 </p>
               </div>
               <div class="m3-flex-row m3-gap-xs" style="flex-wrap: wrap; margin-top: 12px;">
@@ -584,11 +584,11 @@
                 </div>
                 <h3 class="bento-card-title">Toggle with Ctrl+Shift+2</h3>
                 <p class="bento-card-description" style="margin-bottom: 16px;">
-                  Press <kbd>Ctrl</kbd>+<kbd>5</kbd> to toggle ink visibility and glide the toolbar into an unobtrusive pill handle. Press <kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>C</kbd> to wipe all annotations clean instantly.
+                  Press <kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>2</kbd> to toggle ink visibility and glide the toolbar into an unobtrusive pill handle. Press <kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>C</kbd> to wipe all annotations clean instantly.
                 </p>
               </div>
               <div class="m3-flex-row m3-gap-xs" style="flex-wrap: wrap; margin-top: 12px;">
-                <span class="m3-badge-pill" style="font-size: 12px; padding: 4px 10px;"><kbd>Ctrl</kbd>+<kbd>5</kbd> Toggle Pill</span>
+                <span class="m3-badge-pill" style="font-size: 12px; padding: 4px 10px;"><kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>2</kbd> Toggle Pill</span>
                 <span class="m3-badge-pill" style="font-size: 12px; padding: 4px 10px;"><kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>C</kbd> Clear</span>
               </div>
             </article>
@@ -679,22 +679,22 @@
           <!-- Bento Grid Container -->
           <div class="bento-grid">
             
-            <!-- Bento Item 1: 60 FPS Fluid Animation Suite -->
+            <!-- Bento Item 1: Animated Toolbar Interactions -->
             <article class="bento-card bento-col-8">
               <div class="bento-card-header">
                 <div class="bento-card-icon">
                   <span class="material-symbols-rounded">animation</span>
                 </div>
-                <span class="m3-badge-pill">60 FPS Fluid Suite</span>
+                <span class="m3-badge-pill">Animated UI</span>
               </div>
-              <h3 class="bento-card-title">60 FPS Fluid Animation Engine</h3>
+              <h3 class="bento-card-title">Animated Toolbar Interactions</h3>
               <p class="bento-card-description">
-                Direct3D 11 native swapchain combined with <code>QPropertyAnimation</code> (<code>InOutCubic</code> 240ms) delivers seamless toolbar collapse/expand morphing and non-blocking <code>InOutSine</code> opacity fades with zero visual stutter or layout fighting.
+                Qt property animations drive toolbar collapse/expand transitions and non-blocking opacity fades without changing the drawing model.
               </p>
               <div style="background: var(--md-sys-color-surface); border-radius: var(--md-sys-shape-corner-medium); padding: 16px; border: 1px solid var(--md-sys-color-outline-variant);">
                 <div class="m3-flex-row m3-justify-between m3-align-center" style="margin-bottom: 8px;">
                   <span class="m3-label-medium">Frame Dispatch & Jitter</span>
-                  <span class="m3-label-small" style="color: #22c55e; font-weight: 700;">&lt; 1.2ms (Zero Tearing)</span>
+                  <span class="m3-label-small" style="color: #22c55e; font-weight: 700;">Qt property animation</span>
                 </div>
                 <div style="width: 100%; height: 8px; background-color: var(--md-sys-color-surface-container-highest); border-radius: 99px; overflow: hidden;">
                   <div style="width: 12%; height: 100%; background-color: var(--md-sys-color-primary); border-radius: 99px;"></div>
@@ -726,7 +726,7 @@
               </div>
               <h3 class="bento-card-title">Zero-Latency Hover Engine</h3>
               <p class="bento-card-description">
-                Procedural high-DPI tool cursors and instant button tooltips update at 120Hz without stealing OS window focus from Word, web browsers, or presentation slide decks.
+                High-DPI tool cursors and button tooltips respond through the Qt event system without stealing OS window focus from Word, web browsers, or presentation slide decks.
               </p>
             </article>
 
@@ -758,22 +758,22 @@
               </p>
             </article>
 
-            <!-- Bento Item 6: 50,000-Stroke Memory-Safe Undo Stack -->
+            <!-- Bento Item 6: Bounded Drawing and Undo History -->
             <article class="bento-card bento-col-12">
               <div class="m3-flex-row m3-justify-between m3-align-center" style="flex-wrap: wrap; gap: 16px;">
                 <div style="max-width: 680px;">
                   <div class="m3-flex-row m3-gap-sm m3-align-center" style="margin-bottom: 8px;">
                     <span class="material-symbols-rounded" style="color: var(--md-sys-color-primary);">shield</span>
-                    <h3 class="bento-card-title" style="margin: 0;">50,000-Stroke Vector Pipeline & 5,000-Step Undo Stack</h3>
+                    <h3 class="bento-card-title" style="margin: 0;">Bounded Drawing and Undo History</h3>
                   </div>
                   <p class="bento-card-description" style="margin: 0;">
-                    Draw infinitely with confidence. Pen 11 handles up to 50,000 simultaneous on-screen strokes with a massive 5,000-step memory-capped Undo history, zero raster degradation, and 0.0% background idle CPU usage.
+                    Pen 11 uses incremental cached rendering, limits drawing paths to 50,000, and keeps up to 5,000 undo history entries. Actual performance varies with hardware and drawing complexity.
                   </p>
                 </div>
                 <div class="m3-flex-row m3-gap-sm" style="flex-wrap: wrap;">
-                  <span class="m3-badge-pill" style="font-size: 14px; padding: 6px 16px;">50,000+ Strokes</span>
-                  <span class="m3-badge-pill" style="font-size: 14px; padding: 6px 16px;">5,000 Undo Steps</span>
-                  <span class="m3-badge-pill" style="font-size: 14px; padding: 6px 16px;">0.0% Idle CPU</span>
+                  <span class="m3-badge-pill" style="font-size: 14px; padding: 6px 16px;">50,000 Path Limit</span>
+                  <span class="m3-badge-pill" style="font-size: 14px; padding: 6px 16px;">5,000 History Entries</span>
+                  <span class="m3-badge-pill" style="font-size: 14px; padding: 6px 16px;">Bounded History</span>
                 </div>
               </div>
             </article>
@@ -871,13 +871,13 @@
                 </div>
                 <h3 class="bento-card-title">Business Presenters &amp; Streamers</h3>
                 <p class="bento-card-description" style="margin-bottom: 20px;">
-                  Guide audience focus during webinars and software demos using high-contrast translucent highlighters, precision arrows, and callouts. Collapse the toolbar to an unobtrusive pill (<kbd>Ctrl</kbd>+<kbd>5</kbd>) when recording clean screencasts or sharing screens on Zoom, Teams, and OBS.
+                  Guide audience focus during webinars and software demos using high-contrast translucent highlighters, precision arrows, and callouts. Collapse the toolbar to an unobtrusive pill (<kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>2</kbd>) when recording clean screencasts or sharing screens on Zoom, Teams, and OBS.
                 </p>
               </div>
               <ul style="list-style: none; padding: 0; margin: 0; display: flex; flex-direction: column; gap: 8px; border-top: 1px solid var(--md-sys-color-outline-variant); padding-top: 16px;">
                 <li class="m3-flex-row m3-gap-xs m3-align-center" style="font-size: 13px; color: var(--md-sys-color-on-surface);">
                   <span class="material-symbols-rounded" style="font-size: 16px; color: #22c55e;">check_circle</span>
-                  <span>Smooth 60 FPS cubic toolbar collapse (<kbd>Ctrl</kbd>+<kbd>5</kbd>)</span>
+                  <span>Animated toolbar collapse (<kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>2</kbd>)</span>
                 </li>
                 <li class="m3-flex-row m3-gap-xs m3-align-center" style="font-size: 13px; color: var(--md-sys-color-on-surface);">
                   <span class="material-symbols-rounded" style="font-size: 16px; color: #22c55e;">check_circle</span>
@@ -885,7 +885,7 @@
                 </li>
                 <li class="m3-flex-row m3-gap-xs m3-align-center" style="font-size: 13px; color: var(--md-sys-color-on-surface);">
                   <span class="material-symbols-rounded" style="font-size: 16px; color: #22c55e;">check_circle</span>
-                  <span>Sub-millisecond Direct3D 11 screen-share safe</span>
+                  <span>Non-activating overlay for screen sharing</span>
                 </li>
               </ul>
             </article>
@@ -895,44 +895,44 @@
         </div>
       </section>
 
-      <!-- 4. Hardware Benchmarks & Performance Metrics -->
+      <!-- 4. Implementation Facts -->
       <section id="benchmarks" class="m3-section" aria-labelledby="benchmarks-title">
         <div class="m3-container">
           
           <div style="text-align: center; max-width: 720px; margin: 0 auto 48px;">
-            <span class="m3-badge-pill" style="margin-bottom: 12px;">EMPIRICAL BENCHMARKS</span>
+            <span class="m3-badge-pill" style="margin-bottom: 12px;">IMPLEMENTATION FACTS</span>
             <h2 id="benchmarks-title" class="m3-headline-large" style="color: var(--md-sys-color-on-surface); margin-bottom: 12px;">
-              Unmatched Hardware Efficiency
+              Predictable Desktop Behavior
             </h2>
             <p class="m3-body-large" style="">
-              Side-by-side performance analysis on Windows 11 Desktop Window Manager (DWM).
+              These are implementation details, not hardware benchmark guarantees. Actual resource use varies by system and drawing complexity.
             </p>
           </div>
 
           <div class="bento-grid">
             
             <div class="bento-card bento-col-3">
-              <span class="m3-title-small" style="">RAM CONSUMPTION</span>
-              <div class="m3-display-small" style="color: var(--md-sys-color-primary); margin: 8px 0 4px;">48 MB</div>
-              <p class="m3-body-small" style="">vs ~380 MB on Electron tools (87% less RAM)</p>
+              <span class="m3-title-small" style="">RESOURCE USE</span>
+              <div class="m3-display-small" style="color: var(--md-sys-color-primary); margin: 8px 0 4px;">Variable</div>
+              <p class="m3-body-small" style="">Depends on display configuration, hardware, and drawing complexity</p>
             </div>
 
             <div class="bento-card bento-col-3">
-              <span class="m3-title-small" style="">IDLE CPU USAGE</span>
-              <div class="m3-display-small" style="color: #22c55e; margin: 8px 0 4px;">0.0%</div>
-              <p class="m3-body-small" style="">Event loop fully paused when not drawing</p>
+              <span class="m3-title-small" style="">IDLE BEHAVIOR</span>
+              <div class="m3-display-small" style="color: #22c55e; margin: 8px 0 4px;">Event-driven</div>
+              <p class="m3-body-small" style="">The native Qt event loop waits when no work is pending</p>
             </div>
 
             <div class="bento-card bento-col-3">
-              <span class="m3-title-small" style="">FRAME DISPATCH</span>
-              <div class="m3-display-small" style="color: var(--md-sys-color-primary); margin: 8px 0 4px;">&lt; 1.2ms</div>
-              <p class="m3-body-small" style="">Direct3D 11 sub-millisecond dirty-rect blit</p>
+              <span class="m3-title-small" style="">DRAWING CACHE</span>
+              <div class="m3-display-small" style="color: var(--md-sys-color-primary); margin: 8px 0 4px;">Incremental</div>
+              <p class="m3-body-small" style="">Completed strokes are baked while active selections remain transformable</p>
             </div>
 
             <div class="bento-card bento-col-3">
               <span class="m3-title-small" style="">BINARY SIZE</span>
               <div class="m3-display-small" style="color: var(--md-sys-color-primary); margin: 8px 0 4px;" data-gh-size>24.5 MB</div>
-              <p class="m3-body-small" style="">Standalone portable executable. Zero install.</p>
+              <p class="m3-body-small" style="">Current release executable size is loaded from GitHub</p>
             </div>
 
           </div>
@@ -948,7 +948,7 @@
             </button>
             <span class="m3-label-small" style="margin-top: 12px; color: var(--md-sys-color-on-surface-variant); display: inline-flex; align-items: center; gap: 6px;">
               <span class="material-symbols-rounded" style="font-size: 14px; color: var(--md-sys-color-primary);">check_circle</span>
-              <span>Windows 11 / 10 (64-bit) • Direct3D 11 • Portable Standalone</span>
+              <span>Windows 11 / 10 (64-bit) • Native PyQt6 • Portable Standalone</span>
             </span>
           </div>
 
@@ -965,7 +965,7 @@
               Pen 11 vs. Other Screen Markers
             </h2>
             <p class="m3-body-large">
-              Looking for a <strong>free Epic Pen alternative</strong> or modern <strong>gInk alternative</strong>? Pen 11 offers all Pro features completely free. See how Pen 11 delivers modern engineering, stylus fidelity, and 60 FPS performance without paywalls or bloat.
+              Looking for a <strong>free Epic Pen alternative</strong> or modern <strong>gInk alternative</strong>? Pen 11 provides a focused open-source annotation workflow with drawing tools, selection, shapes, and presentation controls.
             </p>
           </div>
 
@@ -1004,19 +1004,19 @@
                 </tr>
                 <tr>
                   <td><strong>UI &amp; Design System</strong></td>
-                  <td style="background-color: rgba(124, 92, 53, 0.05); font-weight: 600;">Modern Windows 11 Fluent / M3 Pill UI with 60 FPS cubic animations</td>
+                  <td style="background-color: rgba(124, 92, 53, 0.05); font-weight: 600;">Modern Windows 11 Fluent / M3 Pill UI with animated toolbar transitions</td>
                   <td>Outdated legacy Win32 UI, rigid window frame</td>
                   <td>Barebones WinForms / GDI+ UI</td>
                 </tr>
                 <tr>
                   <td><strong>Pen Tablet &amp; Stylus</strong></td>
-                  <td style="background-color: rgba(124, 92, 53, 0.05); font-weight: 600;">Native pressure sensitivity &amp; auto stylus eraser flip (<code class="m3-kbd">tabletEvent</code>)</td>
+                  <td style="background-color: rgba(124, 92, 53, 0.05); font-weight: 600;">Mouse and tablet/stylus input through the PyQt6 input path</td>
                   <td>Stylus pressure locked behind paid Pro</td>
                   <td>Basic Wintab/stylus support, no auto-eraser flip</td>
                 </tr>
                 <tr>
                   <td><strong>Rendering Architecture</strong></td>
-                  <td style="background-color: rgba(124, 92, 53, 0.05); font-weight: 600;">Two-Layer Backing Cache (<span style="font-family: var(--md-sys-typescale-font-mono);">O(1)</span> GPU blit) — 50k+ strokes @ 60 FPS</td>
+                  <td style="background-color: rgba(124, 92, 53, 0.05); font-weight: 600;">Incremental backing cache with bounded drawing-path and undo-history limits</td>
                   <td><span style="font-family: var(--md-sys-typescale-font-mono);">O(N)</span> redraw loop; stutters under heavy drawing</td>
                   <td>GDI+ CPU redraw loop; noticeable lag on dense drawings</td>
                 </tr>
@@ -1040,8 +1040,8 @@
                 </tr>
                 <tr>
                   <td><strong>Memory &amp; Idle CPU</strong></td>
-                  <td style="background-color: rgba(124, 92, 53, 0.05); font-weight: 600;">Hardware-accelerated overlay with cached vector rendering</td>
-                  <td>80–150 MB RAM, background helper services</td>
+                  <td style="background-color: rgba(124, 92, 53, 0.05); font-weight: 600;">Native PyQt6 overlay with cached rendering</td>
+                  <td>Resource use varies by system and workload</td>
                   <td>~40–60 MB RAM, software rasterized</td>
                 </tr>
                 <tr>
@@ -1143,7 +1143,7 @@
                 <tr>
                   <td class="shortcut-action">Undo Last Action</td>
                   <td class="shortcut-keys"><div class="m3-kbd-group"><kbd>Ctrl</kbd> + <kbd>Z</kbd></div></td>
-                  <td class="shortcut-desc">Steps backward in the 5,000-step memory-safe undo stack.</td>
+                  <td class="shortcut-desc">Steps backward through the bounded undo history.</td>
                 </tr>
                 <tr>
                   <td class="shortcut-action">Clear Screen</td>
@@ -1240,7 +1240,7 @@ python -m PyInstaller "Pen 11.spec" --noconfirm</code></pre>
                   <span class="material-symbols-rounded" style="color: var(--md-sys-color-primary);">description</span>
                   <div>
                     <strong style="color: var(--md-sys-color-on-surface);">main.py</strong>
-                    <p class="m3-body-small" style="">Frameless Direct3D overlay, 60 FPS animations & event dispatcher.</p>
+                    <p class="m3-body-small" style="">Frameless PyQt6 overlay, animated toolbar, and event dispatcher.</p>
                   </div>
                 </li>
                 <li class="m3-flex-row m3-gap-sm m3-align-center">
@@ -1275,7 +1275,7 @@ python -m PyInstaller "Pen 11.spec" --noconfirm</code></pre>
                   <span class="material-symbols-rounded" style="color: var(--md-sys-color-primary);">history</span>
                   <div>
                     <strong style="color: var(--md-sys-color-on-surface);">HistoryManager</strong>
-                    <p class="m3-body-small" style="">50,000-stroke vector pipeline & 5,000-step memory-safe command stack.</p>
+                    <p class="m3-body-small" style="">Incremental cache with 50,000-path and 5,000-entry safety limits.</p>
                   </div>
                 </li>
               </ul>
@@ -1393,7 +1393,7 @@ python -m PyInstaller "Pen 11.spec" --noconfirm</code></pre>
                 <span class="material-symbols-rounded" style="font-size: 22px; color: var(--md-sys-color-primary); transition: transform 200ms ease;">expand_more</span>
               </summary>
               <p class="m3-body-medium" style="margin-top: 14px; line-height: 1.7; color: var(--md-sys-color-on-surface-variant);">
-                Pen 11 provides native, hardware-level support for any tablet or stylus compatible with Windows Ink / Wintab, including <strong>Wacom</strong> (Intuos, One, Cintiq), <strong>Huion</strong>, <strong>XP-Pen</strong>, <strong>Gaomon</strong>, and <strong>Microsoft Surface Pen</strong>. The app reads raw hardware pressure values via <code class="m3-kbd">tabletEvent()</code> for smooth, natural stroke tapering and automatically detects when you flip your stylus over (<code class="m3-kbd">PointerType.Eraser</code>) to erase without touching the toolbar.
+                Pen 11 accepts mouse and tablet/stylus input through the PyQt6 input path. Pressure-sensitive input and stylus eraser behavior depend on the device and Windows driver.
               </p>
             </details>
 
@@ -1404,7 +1404,7 @@ python -m PyInstaller "Pen 11.spec" --noconfirm</code></pre>
                 <span class="material-symbols-rounded" style="font-size: 22px; color: var(--md-sys-color-primary); transition: transform 200ms ease;">expand_more</span>
               </summary>
               <p class="m3-body-medium" style="margin-top: 14px; line-height: 1.7; color: var(--md-sys-color-on-surface-variant);">
-                Pen 11 is multi-monitor native: its drawing canvas spans your entire virtual desktop across all connected monitors, whether 1080p, 2K, 4K, or mixed DPI. Its smart positioning engine (<code class="m3-kbd">_smart_position()</code>) detects screen boundaries using <code class="m3-kbd">QApplication.screenAt()</code> and automatically flips flyout panels horizontally or vertically so palettes and menus never clip off-screen or slip under the Windows Taskbar.
+                Pen 11 supports virtual desktop geometry and multi-monitor screen changes. Floating panels use available screen geometry to keep their placement within display boundaries.
               </p>
             </details>
 
@@ -1437,7 +1437,7 @@ python -m PyInstaller "Pen 11.spec" --noconfirm</code></pre>
                 <span class="material-symbols-rounded" style="font-size: 22px; color: var(--md-sys-color-primary); transition: transform 200ms ease;">expand_more</span>
               </summary>
               <p class="m3-body-medium" style="margin-top: 14px; line-height: 1.7; color: var(--md-sys-color-on-surface-variant);">
-                <strong>No.</strong> Unlike traditional tools that redraw every single vector point from scratch on every frame ($O(N)$), Pen 11 uses a <strong>Two-Layer Accelerated Backing Cache</strong>: completed strokes are permanently rasterized into a high-DPI Direct3D 11 off-screen buffer ($O(1)$). You can ink <strong>50,000+ strokes</strong> without dropping below 60 FPS or experiencing stroke accumulation lag.
+                Pen 11 incrementally bakes completed strokes into a high-DPI backing cache and keeps selected objects available for vector transforms. The desktop app bounds drawing paths at <strong>50,000</strong> and undo history at <strong>5,000 entries</strong>; actual performance depends on the system and drawing complexity.
               </p>
             </details>
 
@@ -1470,7 +1470,7 @@ python -m PyInstaller "Pen 11.spec" --noconfirm</code></pre>
                 <span class="material-symbols-rounded" style="font-size: 22px; color: var(--md-sys-color-primary); transition: transform 200ms ease;">expand_more</span>
               </summary>
               <p class="m3-body-medium" style="margin-top: 14px; line-height: 1.7; color: var(--md-sys-color-on-surface-variant);">
-                Unlike web/Electron-based tools that run heavy Chromium background loops, Pen 11 is built on native Direct3D 11 and Qt bindings. When you are not drawing, its event loop sleeps at <strong>0.0% CPU</strong> and renders only modified dirty rects during active mouse/stylus strokes.
+                Pen 11 uses a native PyQt6 event-driven loop and cached rendering. CPU and memory usage vary with display configuration, hardware, graphics drivers, and drawing complexity.
               </p>
             </details>
 

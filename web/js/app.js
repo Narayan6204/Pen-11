@@ -111,8 +111,8 @@ class App {
       demoAlertFired = true;
       const isMobile = window.innerWidth < 600;
       const msg = isMobile 
-        ? 'Web Sandbox Demo • Full Direct3D 11 Performance on Desktop'
-        : 'Interactive Web Sandbox (Demo) • Download Desktop App for Full Direct3D 11 Performance';
+        ? 'Web Sandbox Demo • Desktop-only native overlay features'
+        : 'Interactive Web Sandbox (Demo) • Download the desktop app for native overlay features';
       this.showToast(
         msg,
         'info',

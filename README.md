@@ -6,7 +6,7 @@
 ![PyQt6](https://img.shields.io/badge/GUI-PyQt6%20Direct3D11-green.svg)
 [![Live Demo](https://img.shields.io/badge/Live%20Demo-pen--11.pages.dev-orange?style=flat&logo=cloudflarepages)](https://pen-11.pages.dev/)
 
-A high-performance, lightweight, and completely free screen annotation tool built specifically and optimized for Windows 11. Annotate, sketch, and highlight over any application, presentation, IDE, or video call with zero lag and zero window-focus interruption.
+A lightweight, free screen annotation tool for Windows 10 and 11. Annotate, sketch, and highlight over applications, presentations, IDEs, and video calls without taking focus away from the underlying window.
 
 🌐 **Try it in your browser:** Test the vector drawing engine without downloading anything on our [Live Web Demo](https://pen-11.pages.dev/).
 
@@ -37,13 +37,13 @@ How does Pen 11 compare against traditional desktop screen markers?
 | Feature | 🖊️ **Pen 11** | ✏️ **Epic Pen** | 🖋️ **gInk** |
 | :--- | :--- | :--- | :--- |
 | **Price & License** | **100% Free & Open Source (MIT)** | Free (Crippled) / **$25+ Pro Paywall** | Free & Open Source (GPL) |
-| **UI & Design System** | **Modern Windows 11 Fluent / M3 Pill UI** with 60 FPS cubic animations | Outdated legacy Win32 UI, rigid window frame | Barebones WinForms / GDI+ UI |
+| **UI & Design System** | **Modern Windows 11 Fluent / M3 Pill UI** with animated toolbar transitions | Outdated legacy Win32 UI, rigid window frame | Barebones WinForms / GDI+ UI |
 | **Pen Tablet & Stylus** | **Native pressure sensitivity & auto stylus eraser flip** (`tabletEvent()`) | Stylus pressure & advanced features locked behind Pro | Basic Wintab/stylus support, no automatic eraser flip |
-| **Rendering Engine** | **Two-Layer Backing Cache ($O(1)$ GPU blit)** — 50,000+ strokes at 60 FPS | $O(N)$ redraw loop; stutters under heavy drawing | GDI+ CPU redraw loop; noticeable lag on complex canvases |
+| **Rendering Engine** | **Two-Layer Backing Cache** with incremental stroke baking and vector transforms | $O(N)$ redraw loop; stutters under heavy drawing | GDI+ CPU redraw loop; noticeable lag on complex canvases |
 | **Vector Selection & Lasso**| **Oriented Bounding Box (OBB)**: drag, rotate, scale, and delete strokes | None in Free version; limited basic moves in Pro | None (bitmap-style clear/undo only) |
 | **Geometric Shapes** | **Dedicated Shapes Toolbox** (Line, Arrow, Rectangle, Rounded Rect, Circle, Triangle) with Shift-constrain | Manual shapes locked behind paid Pro version | Rudimentary shapes, no gesture detection |
 | **Edge & Taskbar Safety** | **Smart screen-edge detection (`_smart_position()`)** with auto-flip & multi-monitor support | Basic dock snapping; frequently occluded by taskbar | Fixed positioning; can overflow display edges |
-| **Memory & Resource Use**| **< 50 MB RAM**, ~0% idle CPU, Direct3D 11 GPU acceleration | 80–150 MB RAM, background helper services | ~40–60 MB RAM, software rasterized |
+| **Memory & Resource Use**| Native PyQt6 overlay with cached rendering and normal event-driven idle behavior | 80–150 MB RAM, background helper services | ~40–60 MB RAM, software rasterized |
 | **Installation** | **100% Portable single `.exe`** (Zero registry clutter) | Windows installer (`.msi`/`.exe`) required | Portable zip |
 | **Web Companion** | **[Interactive Web Demo](https://pen-11.pages.dev/)** available anywhere | None | None |
 
@@ -62,7 +62,7 @@ How does Pen 11 compare against traditional desktop screen markers?
 * **Taskbar & Dock Protection:** Never lose menus behind the Windows Taskbar or secondary monitor boundaries.
 
 ### ⚡ Two-Layer Accelerated Backing Cache Engine
-* **$O(1)$ Instant GPU Blit:** Replaces traditional $O(N)$ redraw loops with an off-screen high-DPI raster cache (`QPixmap` backing store). Even with **50,000+ active strokes**, rendering time remains locked at **0.05 ms per frame**.
+* **Incremental Backing Cache:** Completed strokes are baked into an off-screen high-DPI raster cache (`QPixmap` backing store), while selected objects remain available for live vector transforms.
 * **Incremental Vector Baking:** Completed drawing strokes are incrementally baked into the cache upon release (`_bake_stroke_to_cache()`), consuming virtually zero CPU cycles during continuous inking.
 * **Ghost-Free Vector Transforms:** Selected objects are temporarily isolated from the static cache during drag, rotate, or scale operations, allowing live vector manipulation before rebaking.
 * **DPI-Aware Backing Store:** Automatically regenerates backing buffers on monitor DPI changes (`DevicePixelRatioChange`) to ensure pin-sharp lines on 4K/retina displays.
@@ -71,13 +71,13 @@ How does Pen 11 compare against traditional desktop screen markers?
 * **Smooth Fading Micro-Interactions:** Custom singleton tooltip manager with smooth alpha fade-in/fade-out transitions and zero border flicker.
 * **Zero Window Focus Stealing:** Engineered with `Qt.WindowDoesNotAcceptFocus` and Windows `WS_EX_NOACTIVATE` flags—hovering over toolbar buttons never steals window focus from typing, slide presentations, or coding IDEs.
 
-### 🎬 60 FPS Fluid Animation Suite
-* **Smooth Toolbar Collapse / Expand:** Toggle ink visibility (`Ctrl+Shift+2`) and watch the toolbar glide into a compact floating pill handle via cubic easing curves (`InOutCubic`, `240ms`) with zero layout flicker.
+### 🎬 Animated Toolbar Interactions
+* **Smooth Toolbar Collapse / Expand:** Toggle ink visibility (`Ctrl+Shift+2`) and the toolbar transitions into a compact floating pill handle using Qt property animations.
 * **Non-Blocking Opacity Fades:** Floating sub-panels (Palette, Shapes, Cursors) fade in and out (`InOutSine`). Rapid clicks dynamically reverse animation from current opacity, avoiding visual snapping.
 
 ### 🪟 Independent Floating Sub-Toolbars
 * **Modular Floating Panels:** Palette, Shapes Menu, and Cursor Toolbars can be independently dragged and placed anywhere across your desktop.
-* **Smart Drag Synchronization:** Dragging the main toolbar naturally pulls attached flyouts along. Once you detach a flyout to a custom location, it remembers its personal coordinates.
+* **Smart Drag Synchronization:** Dragging the main toolbar naturally pulls attached flyouts along. The toolbar and Shapes toolbox positions persist; the Color Palette docks beside the toolbar on each reopen.
 * **Auto-Dismiss on Tool Switch:** Selecting a drawing tool cleanly dismisses transient menus while keeping your favorite color palette open.
 
 ### 📐 Smart Objects & Pure Vector Selection
@@ -128,7 +128,7 @@ Tool sizes are bounded for predictable rendering: Pen **1–30 px**, Highlighter
 | `Ctrl` + `Alt` + `S` | Select **Selection Mode** (select and transform annotations) |
 | `Ctrl` + `Shift` + `1` | Toggle **Cursor mode** while preserving visible drawings |
 | `Ctrl` + `Shift` + `2` | Toggle **Ink Visibility** (Collapses / Expands Toolbar) |
-| `Ctrl` + `Z` | **Undo** last stroke (up to 5,000 steps) |
+| `Ctrl` + `Z` | **Undo** the latest action (up to 5,000 history entries) |
 | `Ctrl` + `Shift` + `C` | **Clear Screen** (Wipes all annotations) |
 | `Ctrl` + `]` | **Increase** Active Tool Size |
 | `Ctrl` + `[` | **Decrease** Active Tool Size |
@@ -166,8 +166,8 @@ Pen 11 is 100% portable:
 ### 4. Can I draw over fullscreen applications, games, and presentation slideshows?
 Yes. Pen 11 creates a transparent, click-through capable Direct3D overlay with non-activating window flags (`Qt.WindowDoesNotAcceptFocus` / `WS_EX_NOACTIVATE`). It draws smoothly over PowerPoint/Keynote slideshows, PDF readers, browser tabs, and desktop applications. For video games, run the game in **Borderless Windowed** mode to allow Windows desktop overlays to render on top.
 
-### 5. Will Pen 11 lag during long presentations or complex diagrams?
-No. Unlike other annotation tools that redraw every single vector stroke on every frame ($O(N)$), Pen 11 uses a **Two-Layer Backing Cache**. Completed strokes are permanently rendered to a high-speed Direct3D-accelerated off-screen buffer ($O(1)$). You can draw **50,000+ strokes** without dropping below 60 FPS or experiencing stroke accumulation lag.
+### 5. How does Pen 11 manage drawing and undo history?
+Completed strokes are incrementally baked into a high-DPI backing cache, while selected objects remain vector data during transforms. The desktop app limits undo history to 5,000 entries and drawing paths to 50,000 paths to keep resource use bounded. Actual performance depends on display size, hardware, and the complexity of the drawing.
 
 ### 6. Does Pen 11 steal window focus from my active applications?
 No. Both the full-screen overlay canvas and floating toolbars strictly use non-activating window flags. You can sketch over PowerPoint presentations, Word documents, browser tabs, or code editors without clicking out of your active workspace.
@@ -176,12 +176,12 @@ No. Both the full-screen overlay canvas and floating toolbars strictly use non-a
 
 ## 💻 System Requirements
 
-Pen 11 is ultra-lightweight, consuming almost **0% CPU when idle** and **less than 50 MB RAM**.
+Pen 11 is a native PyQt6 desktop application with an event-driven idle loop. Actual memory and CPU use vary with display configuration, drawing complexity, and Windows graphics drivers.
 
 * **OS:** Windows 10 or Windows 11 (64-bit recommended)
-* **RAM:** 50 MB to 100 MB free memory
-* **Graphics:** Any GPU supporting DirectX 11 / Direct3D (Intel HD Graphics, AMD, NVIDIA)
-* **Storage:** 22 MB free disk space (Portable `.exe` — ultra-slim Direct3D 11 build)
+* **RAM:** Depends on display configuration, drawing complexity, and Windows
+* **Graphics:** A Windows-compatible graphics stack supported by Qt
+* **Storage:** Approximately 25 MB for the current Windows executable; the release ZIP is larger
 * **Display:** Supports all resolutions (720p, 1080p, 2K, 4K, Ultrawide) and high refresh rates (60Hz, 120Hz, 144Hz+)
 
 ---

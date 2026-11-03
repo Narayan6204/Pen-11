@@ -91,7 +91,7 @@ The most important rule for future work is:
   shortcuts in VS Code, browsers, and presentation software continue to work.
 - Native Windows Ink (`QT_WINTAB=0`) and tablet eraser-end detection.
 - Per-monitor V2 DPI awareness.
-- Direct3D 11 Qt rendering backend.
+- Qt's native Windows graphics integration with a cached backing layer.
 - Above-normal process priority and EcoQoS throttling disabled during the process.
 - Cached rendering for completed strokes plus a live layer for in-progress or
   selected objects.
