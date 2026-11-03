@@ -14,8 +14,8 @@ const CACHE_TTL_MS = 10 * 60 * 1000; // 10 minutes
 const STATIC_FALLBACK = {
   tagName: 'v2.2.0',
   version: '2.2.0',
-  name: 'Pen 11 v2.2.0 (Windows 11 Native Architecture & Input Refinement)',
-  publishedAt: '2026-10-21T00:00:00Z',
+  name: 'v2.2.0',
+  publishedAt: '2026-10-21T15:37:28Z',
   downloadUrl: `https://github.com/${REPO_OWNER}/${REPO_NAME}/releases/latest`,
   directDownloadUrl: `https://github.com/${REPO_OWNER}/${REPO_NAME}/releases/download/v2.2.0/Pen.11.exe`,
   zipDownloadUrl: `https://github.com/${REPO_OWNER}/${REPO_NAME}/releases/download/v2.2.0/Pen-11-v2.2.0-Windows.zip`,
@@ -27,10 +27,10 @@ const STATIC_FALLBACK = {
   source: 'static_fallback'
 };
 
-// Google Drive Fast Mirror Configuration
+// Optional mirror configuration. Empty fileId keeps downloads on GitHub.
 export const GDRIVE_CONFIG = {
-  fileId: '', // Paste Google Drive File ID here for 1-click high-speed download
-  mirrorUrl: 'https://github.com/Narayan6204/Pen-11/releases/latest' // Default fallback to latest release
+  fileId: '',
+  mirrorUrl: 'https://github.com/Narayan6204/Pen-11/releases/latest'
 };
 
 /**
@@ -167,7 +167,7 @@ export class GitHubReleaseManager {
       el.setAttribute('href', release.zipDownloadUrl || release.downloadUrl);
     });
 
-    // Update Google Drive Fast Mirror Links if configured
+    // Update the optional mirror link only when a mirror is configured.
     document.querySelectorAll('[data-gdrive-download-url]').forEach(el => {
       if (GDRIVE_CONFIG.fileId) {
         el.setAttribute('href', `https://drive.usercontent.google.com/download?id=${GDRIVE_CONFIG.fileId}&export=download`);
