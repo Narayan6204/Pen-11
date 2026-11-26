@@ -21,10 +21,11 @@
 
 ### Verification
 - Python static audit (`tinyhtml5`, `tinycss2`, `json`, `xml`): 0 inline `style=`, 0 inline event handlers, 0 CSS parse errors, 0 `transition: all`, 0 `'unsafe-inline'` directives, all JSON-LD/manifest/sitemap/asset links valid.
-- Headless Chrome (`1440x900`, `1024x768`, `840x900`, `768x1024`, `375x812`, `320x568`) CDP verification under strict CSP HTTP headers passed: 0 CSP violations, 0 console/page errors, 0px horizontal overflow at all 6 viewports, 0 mobile footer overlap (`8px` clearance above fixed bottom nav), all fonts/images loaded, native `<dialog>` open/close/focus restore verified, and hotkey filter/search verified. Visual screenshots inspected for both Light and Dark modes plus mobile modal.
+- Follow-up WCAG 2.2 AA `axe-core` audit triggered by CI `quality-gates` failure surfaced 7 contrast/focus/target issues (`terminal-card` `.bento-card code` override, `.text-win-blue` `#0078D4` -> `#60CDFF`, `.download-meta-note`, `.hotkey-search-icon`, `.site-footer` text buttons, FAQ `<summary>` target padding `min-height: 56px`, `tabindex="0"` + `role="region"` on horizontally scrollable tables/`<pre>`, and removing `content-visibility: auto` to prevent un-scrolled theme transition lag).
+- Re-verified `0` blocking `axe-core` WCAG 2.2 AA violations across all 6 matrices (Light & Dark at `1280x800`, `768x1024`, `375x812`) plus full Headless Chrome CDP suite passing cleanly.
 
 ### Next Steps
-- Push changes on `main` to verify the new `quality-gates` + GitHub Pages workflows run green on GitHub Actions.
+- Confirm `Deploy Pen 11 Website` completes green on GitHub Actions and verify both `https://pen-11.pages.dev/` and `https://narayan6204.github.io/Pen-11/`.
 
 ---
 

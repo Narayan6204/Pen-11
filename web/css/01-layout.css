@@ -82,14 +82,6 @@ section[id],
   scroll-margin-top: 76px;
 }
 
-#hotkeys,
-#developers,
-#story,
-#faq {
-  content-visibility: auto;
-  contain-intrinsic-size: auto 600px;
-}
-
 @media (max-width: 599px) {
   .m3-display-medium {
     font-size: 1.85rem;
