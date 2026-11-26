@@ -103,7 +103,7 @@ jobs:
           sleep 2
           node - <<'JS'
           const { chromium } = require('playwright');
-          const AxeBuilder = require('@axe-core/playwright').default;
+          const { AxeBuilder } = require('@axe-core/playwright');
 
           (async () => {
             const browser = await chromium.launch();
@@ -127,29 +127,40 @@ jobs:
               });
               await page.goto('http://localhost:3000/', { waitUntil: 'load' });
               await page.evaluate(() => document.fonts.ready);
-              const overflow = await page.evaluate(
-                () => document.documentElement.scrollWidth - document.documentElement.clientWidth
-              );
-              if (overflow > 1) {
-                throw new Error(`Horizontal overflow (${overflow}px) at ${vp.name} (${vp.width}px)`);
+
+              for (const mode of ['light', 'dark']) {
+                if (mode === 'dark') {
+                  await page.click('[data-theme-mode="dark"]');
+                  await page.waitForTimeout(300);
+                }
+                const overflow = await page.evaluate(
+                  () => document.documentElement.scrollWidth - document.documentElement.clientWidth
+                );
+                if (overflow > 1) {
+                  throw new Error(`Horizontal overflow (${overflow}px) at ${vp.name} (${mode})`);
+                }
+                const axeResults = await new AxeBuilder({ page })
+                  .withTags(['wcag2a', 'wcag2aa', 'wcag21aa', 'wcag22aa'])
+                  .analyze();
+                const blocking = axeResults.violations.filter((v) =>
+                  ['critical', 'serious'].includes(v.impact)
+                );
+                if (blocking.length) {
+                  throw new Error(`Axe violations at ${vp.name} (${mode}): ${JSON.stringify(blocking, null, 2)}`);
+                }
               }
-              const axeResults = await new AxeBuilder({ page })
-                .withTags(['wcag2a', 'wcag2aa', 'wcag21aa', 'wcag22aa'])
-                .analyze();
-              const blocking = axeResults.violations.filter((v) =>
-                ['critical', 'serious'].includes(v.impact)
-              );
-              if (blocking.length) {
-                throw new Error(`Axe violations at ${vp.name}: ${JSON.stringify(blocking, null, 2)}`);
-              }
+
               if (errors.length) {
                 throw new Error(`Runtime errors at ${vp.name}: ${errors.join('; ')}`);
               }
               await page.close();
             }
             await browser.close();
-            console.log('Playwright + Axe WCAG 2.2 AA checks passed across all viewports.');
-          })();
+            console.log('Playwright + Axe WCAG 2.2 AA checks passed across Light & Dark viewports.');
+          })().catch((err) => {
+            console.error(err);
+            process.exit(1);
+          });
           JS
 
   deploy:
