@@ -1,8 +1,6 @@
 /**
  * shortcuts.js
- * Pen 11 Keyboard Shortcuts & Interactive Matrix Search Engine.
- * Handles the desktop shortcut reference in main.py plus browser-demo equivalents.
- * and powers the dynamic Hotkey Matrix search and category filter table.
+ * Pen 11 Keyboard Shortcuts Data & Interactive Search / Category Filter Matrix.
  */
 
 export const SHORTCUTS_DATA = [
@@ -10,330 +8,112 @@ export const SHORTCUTS_DATA = [
     category: 'Drawing Tools',
     action: 'Select Pen Tool',
     keys: ['Ctrl', '1'],
-    description: 'Activates smooth, pressure-sensitive vector pen nib for writing and sketching.',
-    toolId: 'pen'
+    description: 'Activates smooth, pressure-sensitive vector pen nib for writing and sketching.'
   },
   {
     category: 'Drawing Tools',
     action: 'Select Highlighter Tool',
     keys: ['Ctrl', '2'],
-    description: 'Switches to semi-transparent chisel marker with multiply blend mode.',
-    toolId: 'highlighter'
+    description: 'Switches to semi-transparent chisel marker with multiply blend mode.'
   },
   {
     category: 'Drawing Tools',
     action: 'Select Eraser Tool',
     keys: ['Ctrl', '3'],
-    description: 'Erases strokes point-by-point or smart objects by proximity.',
-    toolId: 'eraser'
+    description: 'Erases strokes point-by-point or smart objects by proximity.'
   },
   {
     category: 'Selection & Smart Objects',
     action: 'Selection Mode',
     keys: ['Ctrl', 'Alt', 'S'],
-    description: 'Activates lasso selection and OBB move, rotate, scale, recolor, and delete controls.',
-    toolId: 'select'
+    description: 'Activates lasso selection and OBB move, rotate, scale, recolor, and delete controls.'
   },
   {
     category: 'Canvas Controls',
     action: 'Toggle Cursor Mode',
     keys: ['Ctrl', 'Shift', '1'],
-    description: 'Toggles click-through Cursor mode while preserving existing drawings.',
-    actionId: 'toggle-cursor'
+    description: 'Toggles click-through Cursor mode while preserving existing drawings.'
   },
   {
     category: 'Canvas Controls',
     action: 'Toggle Canvas Visibility',
     keys: ['Ctrl', 'Shift', '2'],
-    description: 'Collapses the toolbar and hides or shows ink without clearing it.',
-    actionId: 'toggle-visibility'
+    description: 'Collapses the toolbar and hides or shows ink without clearing it.'
   },
   {
     category: 'Canvas Controls',
     action: 'Undo Last Action',
     keys: ['Ctrl', 'Z'],
-    description: 'Steps backward in the 5,000-step memory-safe undo stack.',
-    actionId: 'undo'
+    description: 'Steps backward in the 5,000-step memory-safe undo stack.'
   },
   {
     category: 'Canvas Controls',
     action: 'Clear Screen',
     keys: ['Ctrl', 'Shift', 'C'],
-    description: 'Instantly wipes all drawings and strokes from the screen.',
-    actionId: 'clear'
+    description: 'Instantly wipes all drawings and strokes from the screen.'
   },
   {
     category: 'Styling & Sizing',
     action: 'Toggle Color Palette',
     keys: ['Ctrl', 'P'],
-    description: 'Opens or closes the floating 12-color curated swatch toolbox.',
-    actionId: 'toggle-palette'
+    description: 'Opens or closes the floating 12-color curated swatch toolbox.'
   },
   {
     category: 'Canvas Controls',
     action: 'Toggle Background Mode',
     keys: ['Ctrl', 'B'],
-    description: 'Cycles between Transparent Desktop, Whiteboard, and Blackboard.',
-    actionId: 'toggle-backdrop'
+    description: 'Cycles between Transparent Desktop, Whiteboard, and Blackboard.'
   },
   {
     category: 'Styling & Sizing',
     action: 'Increase Nib Size',
     keys: ['Ctrl', ']'],
-    description: 'Increments active stroke nib thickness by +2px.',
-    actionId: 'size-increase'
+    description: 'Increments active stroke nib thickness by +2px.'
   },
   {
     category: 'Styling & Sizing',
     action: 'Decrease Nib Size',
     keys: ['Ctrl', '['],
-    description: 'Decrements active stroke nib thickness by -2px.',
-    actionId: 'size-decrease'
+    description: 'Decrements active stroke nib thickness by -2px.'
   },
   {
     category: 'Canvas Controls',
     action: 'Exit Pen 11',
     keys: ['Ctrl', 'Q'],
-    description: 'Instantly closes and exits the Pen 11 application.',
-    actionId: 'exit-app'
+    description: 'Instantly closes and exits the Pen 11 application.'
   },
   {
     category: 'Selection & Smart Objects',
     action: 'Delete Selected Objects',
     keys: ['Delete', 'Backspace'],
-    description: 'Removes all currently highlighted lasso selections from the screen.',
-    actionId: 'delete-selected'
+    separator: ' / ',
+    description: 'Removes all currently highlighted lasso selections from the screen.'
   },
   {
     category: 'Drawing Tools',
     action: 'Constrain Shapes & Angles',
     keys: ['Shift', 'Drag'],
-    description: 'Snaps line/arrow angles to 45°, rectangle/ellipse to 1:1, and triangle to 90° right angle.',
-    actionId: 'constrain'
+    description: 'Snaps line/arrow angles to 45°, rectangle/ellipse to 1:1, and triangle to 90° right angle.'
   }
 ];
 
 export class ShortcutsManager {
-  /**
-   * @param {Object} context - App context with toolManager, canvasEngine, historyManager, toast, etc.
-   */
-  constructor(context = {}) {
-    this.context = context;
+  constructor() {
     this.tableBody = null;
     this.searchInput = null;
     this.chipContainer = null;
     this.activeCategory = 'all';
     this.searchQuery = '';
-    
-    this._bindKeyboardListener();
-  }
-
-  setContext(context) {
-    this.context = { ...this.context, ...context };
-  }
-
-  _bindKeyboardListener() {
-    window.addEventListener('keydown', (e) => this.handleKeyDown(e));
-  }
-
-  handleKeyDown(e) {
-    // Ignore keystrokes when typing into input or textarea
-    const activeEl = document.activeElement;
-    if (activeEl && (activeEl.tagName === 'INPUT' || activeEl.tagName === 'TEXTAREA' || activeEl.isContentEditable)) {
-      return;
-    }
-
-    const isCtrl = e.ctrlKey || e.metaKey;
-    const isShift = e.shiftKey;
-    const key = e.key;
-    const code = e.code || '';
-
-    // Ctrl + 1: Pen
-    if (isCtrl && !isShift && (key === '1' || code === 'Digit1' || code === 'Numpad1')) {
-      e.preventDefault();
-      this.triggerTool('pen', 'Pen Tool (Ctrl+1)');
-    }
-    // Ctrl + 2: Highlighter
-    else if (isCtrl && !isShift && (key === '2' || code === 'Digit2' || code === 'Numpad2')) {
-      e.preventDefault();
-      this.triggerTool('highlighter', 'Highlighter (Ctrl+2)');
-    }
-    // Ctrl + 3: Eraser
-    else if (isCtrl && !isShift && (key === '3' || code === 'Digit3' || code === 'Numpad3')) {
-      e.preventDefault();
-      this.triggerTool('eraser', 'Eraser (Ctrl+3)');
-    }
-    // Ctrl + Alt + S: Selection Mode
-    else if (isCtrl && e.altKey && (key === 's' || key === 'S' || code === 'KeyS')) {
-      e.preventDefault();
-      this.triggerTool('select', 'Selection Mode (Ctrl+Alt+S)');
-    }
-    // Ctrl + Shift + 1: Toggle Cursor Mode
-    else if (isCtrl && isShift && (key === '1' || code === 'Digit1' || code === 'Numpad1')) {
-      e.preventDefault();
-      this.triggerAction('toggle-cursor', 'Toggled Cursor Mode (Ctrl+Shift+1)');
-    }
-    // Ctrl + Shift + 2: Toggle Canvas Visibility
-    else if (isCtrl && isShift && (key === '2' || code === 'Digit2' || code === 'Numpad2')) {
-      e.preventDefault();
-      this.triggerAction('toggle-visibility', 'Toggled Canvas Visibility (Ctrl+Shift+2)');
-    }
-    // Ctrl + Shift + Z or Ctrl + Y: Redo
-    else if ((isCtrl && isShift && (key === 'z' || key === 'Z' || code === 'KeyZ')) || (isCtrl && !isShift && (key === 'y' || key === 'Y' || code === 'KeyY'))) {
-      e.preventDefault();
-      this.triggerAction('redo', 'Redo (Ctrl+Y)');
-    }
-    // Ctrl + Z: Undo
-    else if (isCtrl && !isShift && (key === 'z' || key === 'Z' || code === 'KeyZ')) {
-      e.preventDefault();
-      this.triggerAction('undo', 'Undo (Ctrl+Z)');
-    }
-    // Ctrl + Shift + C: Clear Screen
-    else if (isCtrl && isShift && (key === 'C' || key === 'c' || code === 'KeyC')) {
-      e.preventDefault();
-      this.triggerAction('clear', 'Clear Screen (Ctrl+Shift+C)');
-    }
-    // Ctrl + ]: Increase Size
-    else if (isCtrl && (key === ']' || code === 'BracketRight')) {
-      e.preventDefault();
-      this.triggerAction('size-increase', 'Nib Size Increased (Ctrl+] )');
-    }
-    // Ctrl + [: Decrease Size
-    else if (isCtrl && (key === '[' || code === 'BracketLeft')) {
-      e.preventDefault();
-      this.triggerAction('size-decrease', 'Nib Size Decreased (Ctrl+[ )');
-    }
-    // Ctrl + P: Toggle Color Palette
-    else if (isCtrl && !isShift && (key === 'p' || key === 'P' || code === 'KeyP')) {
-      e.preventDefault();
-      this.triggerAction('toggle-palette', 'Toggled Color Palette (Ctrl+P)');
-    }
-    // Ctrl + B: Toggle Backdrop
-    else if (isCtrl && !isShift && (key === 'b' || key === 'B' || code === 'KeyB')) {
-      e.preventDefault();
-      this.triggerAction('toggle-backdrop', 'Toggled Background (Ctrl+B)');
-    }
-    // Ctrl + Q: Exit App
-    else if (isCtrl && !isShift && (key === 'q' || key === 'Q' || code === 'KeyQ')) {
-      e.preventDefault();
-      this.triggerAction('exit-app', 'Pen 11 Exit Shortcut (Ctrl+Q)');
-    }
-    // Delete / Backspace: Delete selected
-    else if (key === 'Delete' || key === 'Backspace' || code === 'Delete' || code === 'Backspace') {
-      if (this.context.lassoSelector && this.context.lassoSelector.selectedObjects && this.context.lassoSelector.selectedObjects.length > 0) {
-        e.preventDefault();
-        this.triggerAction('delete-selected', 'Deleted Selected Objects');
-      }
-    }
-  }
-
-  triggerTool(toolName, feedbackMessage) {
-    if (this.context.selectTool) {
-      this.context.selectTool(toolName);
-    } else if (this.context.toolManager) {
-      this.context.toolManager.setTool(toolName);
-      if (this.context.updateToolbarUI) {
-        this.context.updateToolbarUI(toolName);
-      }
-    }
-    if (this.context.showToast && feedbackMessage) {
-      this.context.showToast(feedbackMessage, 'edit');
-    }
-  }
-
-  triggerAction(actionId, feedbackMessage) {
-    const ctx = this.context;
-    
-    switch (actionId) {
-      case 'undo':
-        if (ctx.historyManager) {
-          if (ctx.historyManager.canUndo()) {
-            ctx.historyManager.undo();
-          } else {
-            feedbackMessage = 'Nothing to Undo';
-          }
-        }
-        break;
-      case 'redo':
-        if (ctx.historyManager) {
-          if (ctx.historyManager.canRedo()) {
-            ctx.historyManager.redo();
-          } else {
-            feedbackMessage = 'Nothing to Redo';
-          }
-        }
-        break;
-      case 'clear':
-        if (ctx.historyManager) {
-          ctx.historyManager.executeClearCanvas();
-        } else if (ctx.canvasEngine) {
-          ctx.canvasEngine.clear();
-        }
-        break;
-      case 'toggle-visibility':
-        if (ctx.toggleCanvasVisibility) {
-          ctx.toggleCanvasVisibility();
-          return; // Toast handled by callback
-        }
-        break;
-      case 'toggle-cursor':
-        if (ctx.showRestrictedToast) {
-          ctx.showRestrictedToast();
-          return;
-        }
-        feedbackMessage = 'Cursor Mode is available in the Windows desktop app';
-        break;
-      case 'size-increase':
-        if (ctx.toolManager) {
-          const newSize = Math.min(45, ctx.toolManager.size + 2);
-          ctx.toolManager.setSize(newSize);
-          if (ctx.updateSizeUI) ctx.updateSizeUI(newSize);
-          feedbackMessage = `Nib Size: ${newSize}px`;
-        }
-        break;
-      case 'size-decrease':
-        if (ctx.toolManager) {
-          const newSize = Math.max(1, ctx.toolManager.size - 2);
-          ctx.toolManager.setSize(newSize);
-          if (ctx.updateSizeUI) ctx.updateSizeUI(newSize);
-          feedbackMessage = `Nib Size: ${newSize}px`;
-        }
-        break;
-      case 'toggle-palette':
-        if (ctx.togglePalette) {
-          ctx.togglePalette();
-          return;
-        }
-        break;
-      case 'toggle-backdrop':
-        if (ctx.cycleBackdrop) {
-          const mode = ctx.cycleBackdrop();
-          feedbackMessage = `Background: ${mode.toUpperCase()}`;
-        }
-        break;
-      case 'exit-app':
-        feedbackMessage = 'Pen 11 Exit Shortcut (Ctrl+Q)';
-        break;
-      case 'delete-selected':
-        if (ctx.lassoSelector && ctx.lassoSelector.selectedObjects.length > 0) {
-          ctx.lassoSelector.deleteSelection();
-        }
-        break;
-    }
-
-    if (ctx.showToast && feedbackMessage) {
-      ctx.showToast(feedbackMessage, 'keyboard');
-    }
   }
 
   /**
    * Initializes interactive search & filter table in the DOM
-   * @param {Object} elements - { tableBody, searchInput, chipContainer }
+   * @param {{ tableBody: HTMLElement, searchInput?: HTMLElement, chipContainer?: HTMLElement }} elements
    */
   initTable(elements) {
     this.tableBody = elements.tableBody;
-    this.searchInput = elements.searchInput;
-    this.chipContainer = elements.chipContainer;
+    this.searchInput = elements.searchInput || null;
+    this.chipContainer = elements.chipContainer || null;
 
     if (this.searchInput) {
       this.searchInput.addEventListener('input', (e) => {
@@ -346,9 +126,12 @@ export class ShortcutsManager {
       this.chipContainer.addEventListener('click', (e) => {
         const chip = e.target.closest('.m3-chip');
         if (!chip) return;
-        
-        this.chipContainer.querySelectorAll('.m3-chip').forEach(c => c.classList.remove('active'));
-        chip.classList.add('active');
+
+        this.chipContainer.querySelectorAll('.m3-chip').forEach((c) => {
+          const isSelected = c === chip;
+          c.classList.toggle('active', isSelected);
+          c.setAttribute('aria-selected', isSelected ? 'true' : 'false');
+        });
         this.activeCategory = chip.dataset.category || 'all';
         this.renderTable();
       });
@@ -360,44 +143,75 @@ export class ShortcutsManager {
   renderTable() {
     if (!this.tableBody) return;
 
-    const filtered = SHORTCUTS_DATA.filter(item => {
+    const filtered = SHORTCUTS_DATA.filter((item) => {
       const matchCategory = this.activeCategory === 'all' || item.category === this.activeCategory;
-      const matchSearch = !this.searchQuery || 
+      const matchSearch =
+        !this.searchQuery ||
         item.action.toLowerCase().includes(this.searchQuery) ||
         item.description.toLowerCase().includes(this.searchQuery) ||
         item.keys.join(' ').toLowerCase().includes(this.searchQuery);
       return matchCategory && matchSearch;
     });
 
+    const fragment = document.createDocumentFragment();
+
     if (filtered.length === 0) {
-      this.tableBody.innerHTML = `
-        <tr>
-          <td colspan="3" style="text-align: center; padding: 32px; color: var(--md-sys-color-outline);">
-            <div class="m3-flex-col m3-align-center m3-gap-sm">
-              <span class="material-symbols-rounded" style="font-size: 36px;">search_off</span>
-              <p>No matching keyboard shortcuts found</p>
-            </div>
-          </td>
-        </tr>
-      `;
+      const row = document.createElement('tr');
+      const cell = document.createElement('td');
+      cell.colSpan = 3;
+      cell.className = 'shortcuts-empty-cell';
+
+      const wrap = document.createElement('div');
+      wrap.className = 'm3-flex-col m3-align-center m3-gap-sm';
+
+      const icon = document.createElement('span');
+      icon.className = 'material-symbols-rounded shortcuts-empty-icon';
+      icon.setAttribute('aria-hidden', 'true');
+      icon.textContent = 'search_off';
+
+      const msg = document.createElement('p');
+      msg.textContent = 'No matching keyboard shortcuts found';
+
+      wrap.append(icon, msg);
+      cell.appendChild(wrap);
+      row.appendChild(cell);
+      fragment.appendChild(row);
+      this.tableBody.replaceChildren(fragment);
       return;
     }
 
-    this.tableBody.innerHTML = filtered.map(item => `
-      <tr>
-        <td class="shortcut-action">
-          ${item.action}
-        </td>
-        <td class="shortcut-keys">
-          <div class="m3-kbd-group">
-            ${item.keys.map(k => `<kbd>${k}</kbd>`).join(' + ')}
-          </div>
-        </td>
-        <td class="shortcut-desc">
-          ${item.description}
-        </td>
-      </tr>
-    `).join('');
+    filtered.forEach((item) => {
+      const row = document.createElement('tr');
+
+      const actionCell = document.createElement('td');
+      actionCell.className = 'shortcut-action';
+      actionCell.textContent = item.action;
+
+      const keysCell = document.createElement('td');
+      keysCell.className = 'shortcut-keys';
+      const kbdGroup = document.createElement('div');
+      kbdGroup.className = 'm3-kbd-group';
+
+      const joiner = item.separator || ' + ';
+      item.keys.forEach((keyLabel, index) => {
+        if (index > 0) {
+          kbdGroup.appendChild(document.createTextNode(joiner));
+        }
+        const kbd = document.createElement('kbd');
+        kbd.textContent = keyLabel;
+        kbdGroup.appendChild(kbd);
+      });
+      keysCell.appendChild(kbdGroup);
+
+      const descCell = document.createElement('td');
+      descCell.className = 'shortcut-desc';
+      descCell.textContent = item.description;
+
+      row.append(actionCell, keysCell, descCell);
+      fragment.appendChild(row);
+    });
+
+    this.tableBody.replaceChildren(fragment);
   }
 }
 

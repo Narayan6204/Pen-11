@@ -1,48 +1,181 @@
-name: Deploy Pen 11 Website to GitHub Pages
+name: Deploy Pen 11 Website
 
 on:
   push:
     branches:
       - main
+    paths:
+      - 'web/**'
+      - 'serve.js'
+      - 'firebase.json'
+      - 'wrangler.toml'
+      - '.github/workflows/deploy.yml'
+  pull_request:
+    branches:
+      - main
+    paths:
+      - 'web/**'
+      - 'serve.js'
+      - 'firebase.json'
+      - 'wrangler.toml'
+      - '.github/workflows/deploy.yml'
   workflow_dispatch:
 
 permissions:
-  contents: write
-  pages: write
-  id-token: write
+  contents: read
 
 concurrency:
-  group: "pages"
-  cancel-in-progress: false
+  group: 'pages'
+  cancel-in-progress: true
 
 jobs:
+  quality-gates:
+    name: Static, Security, A11y & Responsive Gates
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python 3.12
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Run static HTML, JSON-LD, CSP & asset integrity checks
+        run: |
+          python3 - <<'PY'
+          import json
+          import re
+          import sys
+          import xml.etree.ElementTree as ET
+          from pathlib import Path
+
+          html = Path('web/index.html').read_text(encoding='utf-8')
+          headers_txt = Path('web/_headers').read_text(encoding='utf-8')
+          fb = json.loads(Path('firebase.json').read_text(encoding='utf-8'))
+          manifest = json.loads(Path('web/manifest.webmanifest').read_text(encoding='utf-8'))
+          ET.fromstring(Path('web/sitemap.xml').read_text(encoding='utf-8'))
+
+          errors = []
+          if re.search(r'\sstyle\s*=', html, re.I):
+              errors.append('Found inline style= attribute in web/index.html (violates zero-unsafe-inline CSP)')
+          if re.search(r'\son(?:click|load|change|input|keydown)\s*=', html, re.I):
+              errors.append('Found inline event handler attribute in web/index.html')
+          if "'unsafe-inline'" in headers_txt or "'unsafe-inline'" in json.dumps(fb):
+              errors.append("Found 'unsafe-inline' in CSP configuration")
+
+          ld_blocks = re.findall(
+              r'<script\s+type="application/ld\+json"\s*>(.*?)</script>', html, re.S
+          )
+          if not ld_blocks:
+              errors.append('Missing JSON-LD structured data in web/index.html')
+          for idx, block in enumerate(ld_blocks):
+              json.loads(block)
+
+          for icon in manifest.get('icons', []):
+              src = Path('web') / icon['src']
+              if not src.is_file():
+                  errors.append(f'Missing manifest icon: {src}')
+
+          for css in Path('web/css').glob('*.css'):
+              txt = css.read_text(encoding='utf-8')
+              if re.search(r'transition\s*:\s*all\b', txt):
+                  errors.append(f'Forbidden transition: all found in {css}')
+
+          if errors:
+              print('\n'.join(errors), file=sys.stderr)
+              sys.exit(1)
+          print(f'Static quality checks passed ({len(ld_blocks)} JSON-LD blocks verified).')
+          PY
+
+      - name: Set up Node 20
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Run Playwright WCAG 2.2 AA & CSP verification
+        run: |
+          npm install --no-save playwright @axe-core/playwright
+          npx playwright install --with-deps chromium
+          node serve.js &
+          SERVER_PID=$!
+          trap "kill $SERVER_PID || true" EXIT
+          sleep 2
+          node - <<'JS'
+          const { chromium } = require('playwright');
+          const AxeBuilder = require('@axe-core/playwright').default;
+
+          (async () => {
+            const browser = await chromium.launch();
+            for (const vp of [
+              { name: 'desktop', width: 1280, height: 800 },
+              { name: 'tablet', width: 768, height: 1024 },
+              { name: 'mobile', width: 375, height: 812 }
+            ]) {
+              const page = await browser.newPage({ viewport: vp });
+              await page.route('https://api.github.com/**', (route) =>
+                route.fulfill({
+                  status: 200,
+                  contentType: 'application/json',
+                  body: JSON.stringify({ tag_name: 'v2.2.0', assets: [] })
+                })
+              );
+              const errors = [];
+              page.on('pageerror', (e) => errors.push(`pageerror: ${e.message}`));
+              page.on('console', (m) => {
+                if (m.type() === 'error') errors.push(`console.error: ${m.text()}`);
+              });
+              await page.goto('http://localhost:3000/', { waitUntil: 'load' });
+              await page.evaluate(() => document.fonts.ready);
+              const overflow = await page.evaluate(
+                () => document.documentElement.scrollWidth - document.documentElement.clientWidth
+              );
+              if (overflow > 1) {
+                throw new Error(`Horizontal overflow (${overflow}px) at ${vp.name} (${vp.width}px)`);
+              }
+              const axeResults = await new AxeBuilder({ page })
+                .withTags(['wcag2a', 'wcag2aa', 'wcag21aa', 'wcag22aa'])
+                .analyze();
+              const blocking = axeResults.violations.filter((v) =>
+                ['critical', 'serious'].includes(v.impact)
+              );
+              if (blocking.length) {
+                throw new Error(`Axe violations at ${vp.name}: ${JSON.stringify(blocking, null, 2)}`);
+              }
+              if (errors.length) {
+                throw new Error(`Runtime errors at ${vp.name}: ${errors.join('; ')}`);
+              }
+              await page.close();
+            }
+            await browser.close();
+            console.log('Playwright + Axe WCAG 2.2 AA checks passed across all viewports.');
+          })();
+          JS
+
   deploy:
+    name: Deploy to GitHub Pages
+    needs: [quality-gates]
+    if: github.event_name == 'push' || github.event_name == 'workflow_dispatch'
+    permissions:
+      pages: write
+      id-token: write
+      contents: read
     environment:
       name: github-pages
       url: ${{ steps.deployment.outputs.page_url }}
     runs-on: ubuntu-latest
     steps:
-      - name: Checkout Repository
+      - name: Checkout repository
         uses: actions/checkout@v4
 
-      - name: Setup Pages
+      - name: Configure GitHub Pages
         uses: actions/configure-pages@v5
-        continue-on-error: true
 
-      - name: Upload Pages Artifact
+      - name: Upload Pages artifact
         uses: actions/upload-pages-artifact@v3
         with:
           path: 'web'
-        continue-on-error: true
 
-      - name: Deploy to GitHub Pages (Native)
+      - name: Deploy to GitHub Pages
         id: deployment
         uses: actions/deploy-pages@v4
-        continue-on-error: true
-
-      - name: Deploy to gh-pages branch (Universal Fallback)
-        uses: peaceiris/actions-gh-pages@v4
-        with:
-          github_token: ${{ secrets.GITHUB_TOKEN }}
-          publish_dir: ./web
-          publish_branch: gh-pages

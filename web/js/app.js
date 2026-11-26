@@ -1,586 +1,31 @@
 /**
  * app.js
  * Main Application Orchestrator for the Pen 11 Web Application.
- * Connects CanvasEngine, ToolManager, HistoryManager, LassoSelector, ThemeEngine,
- * ShortcutsManager, GitHubReleaseManager, Draggable Floating Toolbar, 12-Color Palette,
- * Shape Menu, and Toast HUD.
+ * Connects ThemeEngine, ShortcutsManager, GitHubReleaseManager, Dialog & Toast HUD.
  */
 
-import { CanvasEngine, ToolManager, HistoryManager, LassoSelector } from './canvas/index.js';
-import { themeEngine, THEME_SEEDS } from './theme.js';
-import { rippleEngine } from './ripple.js';
+import { themeEngine } from './theme.js';
 import { shortcutsManager } from './shortcuts.js';
 import { gitHubReleaseManager } from './github-release.js';
 
 class App {
   constructor() {
-    this.canvasEngine = null;
-    this.toolManager = null;
-    this.historyManager = null;
-    this.lassoSelector = null;
-    
-    this.currentColor = '#000000';
-    this.backdropModes = ['transparent', 'whiteboard', 'blackboard'];
-    this.currentBackdropIndex = 0;
-
-    this.penSize = 5;
-    this.highlighterSize = 25;
-    this.eraserSize = 40;
-    this.penColor = '#000000';
-    this.highlighterColor = '#FFCC00';
-
-    // Monkey State: 'active' (🐵) | 'cursor' (🐒) | 'hidden' (🙈)
-    this.monkeyState = 'active';
-    this.isCanvasVisible = true;
-
     this.toastTimer = null;
   }
 
   async init() {
-    // 1. Initialize Interactive Canvas Sandbox
-    this._initCanvas();
-
-    // 2. Initialize Draggable Floating Pen 11 Toolbar
-    this._initDraggableToolbar();
-
-    // 3. Initialize Theme Controls
     this._initThemeControls();
-
-    // 4. Initialize Top App Bar & Navigation
     this._initNavigation();
-
-    // 5. Initialize Shortcuts Matrix & Global Key Listener
     this._initShortcuts();
-
-    // 6. Fetch Latest Release Data from GitHub
     this._initGitHubReleases();
-
-    // 7. Initialize Download Preference Modal
     this._initDownloadModal();
-
-    console.log('Pen 11 Web Experience Initialized with desktop-aligned shortcuts.');
-  }
-
-  // ==========================================================================
-  // 1. Canvas Engine Setup
-  // ==========================================================================
-  _initCanvas() {
-    const container = document.getElementById('pen-hero-canvas-container');
-    if (!container) return;
-
-    this.canvasEngine = new CanvasEngine(container, {
-      backgroundColor: 'rgba(0,0,0,0.008)',
-      gridType: 'none'
-    });
-
-    this.historyManager = new HistoryManager(this.canvasEngine);
-    this.toolManager = new ToolManager(this.canvasEngine, this.historyManager);
-    this.lassoSelector = new LassoSelector(this.canvasEngine, this.toolManager, this.historyManager);
-
-    // Initial tool & color settings
-    this.selectTool('pen');
-    this.toolManager.setColor(this.penColor);
-    this.toolManager.setSize(this.penSize);
-
-    // Sync History Button States (Undo)
-    this.historyManager.onChange((state) => {
-      const undoBtn = document.getElementById('tb-btn-undo');
-      if (undoBtn) undoBtn.disabled = !state.canUndo;
-    });
-
-    // Handle Window Resize
-    window.addEventListener('resize', () => {
-      if (this.canvasEngine) {
-        this.canvasEngine.resize();
-      }
-    });
-
-    // Subscribe to Theme Engine Re-tinting
-    themeEngine.onCanvasRetint((theme) => {
-      if (!this.canvasEngine) return;
-      this.canvasEngine.options.gridColor = theme.isDark 
-        ? 'rgba(255, 255, 255, 0.08)' 
-        : 'rgba(0, 97, 164, 0.12)';
-      this.canvasEngine.invalidate();
-    });
-
-    // Advisory Toast on first click/interaction in Sandbox on each page load
-    let demoAlertFired = false;
-    const triggerDemoAlert = () => {
-      if (demoAlertFired) return;
-      demoAlertFired = true;
-      const isMobile = window.innerWidth < 600;
-      const msg = isMobile 
-        ? 'Web Sandbox Demo • Desktop-only native overlay features'
-        : 'Interactive Web Sandbox (Demo) • Download the desktop app for native overlay features';
-      this.showToast(
-        msg,
-        'info',
-        '<a href="https://github.com/Narayan6204/Pen-11/releases/latest" class="m3-btn m3-btn-filled" style="height: 32px; font-size: 12px; padding: 0 12px; text-decoration: none; background: var(--md-sys-color-primary); color: var(--md-sys-color-on-primary); white-space: nowrap; flex-shrink: 0;">Download</a>',
-        4000
-      );
-    };
-
-    const stageWrapper = document.getElementById('canvas-stage-wrapper');
-    if (stageWrapper) {
-      stageWrapper.addEventListener('pointerdown', triggerDemoAlert, { capture: true });
-      stageWrapper.addEventListener('mousedown', triggerDemoAlert, { capture: true });
-      stageWrapper.addEventListener('touchstart', triggerDemoAlert, { capture: true });
-    }
-
-    if (this.canvasEngine) {
-      this.canvasEngine.on('pointerdown', triggerDemoAlert);
-    }
-  }
-
-  // ==========================================================================
-  // 2. Draggable Warm Sand Toolbar Setup & Detachable Sub-Toolbars
-  // ==========================================================================
-  _initDraggableToolbar() {
-    const toolbar = document.getElementById('pen-live-toolbar');
-    const dragHandle = document.getElementById('pen-toolbar-drag');
-    const stageWrapper = document.getElementById('canvas-stage-wrapper');
-    if (!toolbar || !dragHandle || !stageWrapper) return;
-
-    // 1. Enable Dragging on Main Toolbar by Pill Handle with Boundary Constraints
-    this._makeDraggableByPill(toolbar, dragHandle, stageWrapper);
-
-    // 2. Enable Dragging on Color Palette Submenu by Pill Handle with Boundary Constraints
-    const palettePopover = document.getElementById('tb-palette-popover');
-    const paletteDrag = document.getElementById('tb-palette-drag');
-    if (palettePopover && paletteDrag) {
-      this._makeDraggableByPill(palettePopover, paletteDrag, stageWrapper);
-    }
-
-    // 3. Enable Dragging on Shapes Submenu by Pill Handle with Boundary Constraints
-    const shapesFlyout = document.getElementById('tb-shapes-flyout');
-    const shapesDrag = document.getElementById('tb-shapes-drag');
-    if (shapesFlyout && shapesDrag) {
-      this._makeDraggableByPill(shapesFlyout, shapesDrag, stageWrapper);
-    }
-
-    // ── Monkey / Cursor Flyout Handler (Horizontal 2-Button Submenu) ──
-    const monkeyBtn = document.getElementById('tb-btn-monkey');
-    const monkeyFlyout = document.getElementById('tb-monkey-flyout');
-    const monkeyIcon = document.getElementById('tb-monkey-icon');
-
-    const updateMonkeyFlyoutButtons = () => {
-      if (!monkeyFlyout) return;
-      if (this.monkeyState === 'cursor') {
-        monkeyFlyout.innerHTML = `
-          <button class="toolbar-tool-btn" data-monkey="active" title="Active Ink Mode" aria-label="Active Ink Mode">
-            <span>🐵</span>
-          </button>
-          <button class="toolbar-tool-btn" data-monkey="hidden" title="Disable Canvas (Collapse Toolbar)" aria-label="Disable Canvas">
-            <span>🙈</span>
-          </button>
-        `;
-      } else {
-        monkeyFlyout.innerHTML = `
-          <button class="toolbar-tool-btn" data-monkey="cursor" title="Cursor Mode (Desktop Feature)" aria-label="Cursor Mode">
-            <span>🐒</span>
-          </button>
-          <button class="toolbar-tool-btn" data-monkey="hidden" title="Disable Canvas (Collapse Toolbar)" aria-label="Disable Canvas">
-            <span>🙈</span>
-          </button>
-        `;
-      }
-      
-      monkeyFlyout.querySelectorAll('[data-monkey]').forEach(btn => {
-        btn.addEventListener('click', (e) => {
-          e.stopPropagation();
-          this._closeAllPopovers();
-          const action = btn.getAttribute('data-monkey');
-          
-          if (action === 'active') {
-            this.setCanvasVisibility(true);
-            this.selectTool('pen');
-            if (monkeyIcon) monkeyIcon.textContent = '🐵';
-          } else if (action === 'cursor') {
-            // Restrict cursor click-through mode in web preview
-            this.showRestrictedToast();
-          } else if (action === 'hidden') {
-            this.setCanvasVisibility(false);
-            if (monkeyIcon) monkeyIcon.textContent = '🙈';
-          }
-        });
-      });
-    };
-
-    if (monkeyBtn && monkeyFlyout) {
-      updateMonkeyFlyoutButtons();
-
-      monkeyBtn.addEventListener('click', (e) => {
-        e.stopPropagation();
-        if (!this.isCanvasVisible && toolbar.classList.contains('collapsed')) {
-          this.setCanvasVisibility(true);
-          this.selectTool('pen');
-          return;
-        }
-
-        const isOpen = monkeyFlyout.style.display === 'flex';
-        this._closeAllPopovers();
-        if (!isOpen) {
-          updateMonkeyFlyoutButtons();
-          monkeyFlyout.style.display = 'flex';
-        } else {
-          monkeyFlyout.style.display = 'none';
-        }
-      });
-    }
-
-    // ── Bind Tool Buttons (with desktop restriction on select) ──
-    toolbar.querySelectorAll('[data-tool]').forEach(btn => {
-      btn.addEventListener('click', () => {
-        const tool = btn.dataset.tool;
-        if (tool === 'select') {
-          this.showRestrictedToast();
-          return;
-        }
-        this.selectTool(tool);
-      });
-    });
-
-    // ── Bind Shapes Flyout (Restricted in web sandbox) ──
-    const shapesBtn = document.getElementById('tb-btn-shapes');
-    if (shapesBtn && shapesFlyout) {
-      shapesBtn.addEventListener('click', (e) => {
-        e.stopPropagation();
-        const isOpen = shapesFlyout.style.display === 'flex';
-        this._closeAllPopovers();
-        shapesFlyout.style.display = isOpen ? 'none' : 'flex';
-      });
-
-      shapesFlyout.querySelectorAll('[data-shape]').forEach(shapeItem => {
-        shapeItem.addEventListener('click', () => {
-          this.showRestrictedToast();
-        });
-      });
-    }
-
-    // ── Bind Floating 12-Color Palette ──
-    const paletteBtn = document.getElementById('tb-btn-palette');
-    if (paletteBtn && palettePopover) {
-      paletteBtn.addEventListener('click', (e) => {
-        e.stopPropagation();
-        const isOpen = palettePopover.style.display === 'flex';
-        this._closeAllPopovers();
-        palettePopover.style.display = isOpen ? 'none' : 'flex';
-      });
-
-      palettePopover.querySelectorAll('.palette-color-btn').forEach(btn => {
-        btn.addEventListener('click', () => {
-          const hex = btn.dataset.hex;
-          this.selectColor(hex);
-          this.showToast(`Color: ${btn.title || hex}`, 'palette');
-        });
-      });
-    }
-
-    // ── Bind Undo / Clear Actions ──
-    const undoBtn = document.getElementById('tb-btn-undo');
-    if (undoBtn) {
-      undoBtn.addEventListener('click', () => {
-        if (this.historyManager) this.historyManager.undo();
-      });
-    }
-
-    const clearBtn = document.getElementById('tb-btn-clear');
-    if (clearBtn) {
-      clearBtn.addEventListener('click', () => {
-        if (this.historyManager) {
-          this.historyManager.executeClearCanvas();
-          this.showToast('Canvas Cleared (Ctrl+Shift+C)', 'delete');
-        }
-      });
-    }
-
-    // ── Bind Backdrop Switcher ──
-    const backdropBtn = document.getElementById('tb-btn-bg');
-    if (backdropBtn) {
-      backdropBtn.addEventListener('click', () => {
-        this.cycleBackdrop();
-      });
-    }
-
-    // Close popovers on click outside
-    document.addEventListener('click', (e) => {
-      if (!e.target.closest('#pen-live-toolbar') && !e.target.closest('#tb-shapes-flyout') && !e.target.closest('#tb-palette-popover')) {
-        this._closeAllPopovers();
-      }
-    });
-  }
-
-  /**
-   * Enables smooth dragging of toolbars/submenus via their pill handles,
-   * with boundary constraints applied strictly to the pill handle itself.
-   */
-  _makeDraggableByPill(element, dragHandle, container) {
-    if (!element || !dragHandle || !container) return;
-
-    let isDragging = false;
-    let startX = 0, startY = 0;
-    let initialLeft = 0, initialTop = 0;
-    let parentOffsetX = 0, parentOffsetY = 0;
-
-    const onPointerDown = (e) => {
-      if (e.button !== 0 && e.pointerType === 'mouse') return;
-      e.stopPropagation();
-      if (e.cancelable) e.preventDefault();
-      isDragging = true;
-      startX = e.clientX ?? (e.touches && e.touches[0]?.clientX) ?? 0;
-      startY = e.clientY ?? (e.touches && e.touches[0]?.clientY) ?? 0;
-
-      const rect = element.getBoundingClientRect();
-      const containerRect = container.getBoundingClientRect();
-      const offsetParent = element.offsetParent || container;
-      const parentRect = offsetParent.getBoundingClientRect();
-
-      parentOffsetX = parentRect.left - containerRect.left;
-      parentOffsetY = parentRect.top - containerRect.top;
-
-      initialLeft = rect.left - parentRect.left;
-      initialTop = rect.top - parentRect.top;
-
-      element.style.transition = 'none';
-      element.style.left = `${initialLeft}px`;
-      element.style.top = `${initialTop}px`;
-      element.style.right = 'auto';
-      element.style.bottom = 'auto';
-      element.style.transform = 'none';
-      try {
-        dragHandle.setPointerCapture(e.pointerId);
-      } catch (err) {}
-    };
-
-    const onPointerMove = (e) => {
-      if (!isDragging) return;
-      e.stopPropagation();
-      if (e.cancelable) e.preventDefault();
-      const currentX = e.clientX ?? (e.touches && e.touches[0]?.clientX) ?? 0;
-      const currentY = e.clientY ?? (e.touches && e.touches[0]?.clientY) ?? 0;
-      const dx = currentX - startX;
-      const dy = currentY - startY;
-
-      const containerRect = container.getBoundingClientRect();
-      const handleOffsetLeft = dragHandle.offsetLeft || 0;
-      const handleOffsetTop = dragHandle.offsetTop || 0;
-      const handleWidth = dragHandle.offsetWidth || 40;
-      const handleHeight = dragHandle.offsetHeight || 14;
-
-      // Bound constraints apply strictly to keeping the pill handle inside the sandbox container
-      const minLeft = 8 - parentOffsetX - handleOffsetLeft;
-      const maxLeft = containerRect.width - handleWidth - 8 - parentOffsetX - handleOffsetLeft;
-      const minTop = 8 - parentOffsetY - handleOffsetTop;
-      const maxTop = containerRect.height - handleHeight - 8 - parentOffsetY - handleOffsetTop;
-
-      let newLeft = Math.max(minLeft, Math.min(maxLeft, initialLeft + dx));
-      let newTop = Math.max(minTop, Math.min(maxTop, initialTop + dy));
-
-      element.style.left = `${newLeft}px`;
-      element.style.top = `${newTop}px`;
-      element.style.transform = 'none';
-    };
-
-    const onPointerUp = (e) => {
-      if (!isDragging) return;
-      isDragging = false;
-      element.style.transition = '';
-      try {
-        dragHandle.releasePointerCapture(e.pointerId);
-      } catch (err) {}
-    };
-
-    dragHandle.addEventListener('pointerdown', onPointerDown);
-    dragHandle.addEventListener('pointermove', onPointerMove);
-    dragHandle.addEventListener('pointerup', onPointerUp);
-    dragHandle.addEventListener('pointercancel', onPointerUp);
-  }
-
-  _closeAllPopovers() {
-    const popovers = document.querySelectorAll('.toolbar-palette-popover, .toolbar-shape-flyout, .toolbar-monkey-flyout');
-    popovers.forEach(p => p.style.display = 'none');
-  }
-
-  selectTool(toolName) {
-    if (!this.toolManager) return;
-    this.toolManager.setTool(toolName);
-    
-    if (toolName === 'pen') {
-      this.toolManager.setSize(this.penSize);
-      this.toolManager.setColor(this.penColor);
-    } else if (toolName === 'highlighter') {
-      this.toolManager.setSize(this.highlighterSize);
-      this.toolManager.setColor(this.highlighterColor);
-    } else if (toolName === 'eraser') {
-      this.toolManager.setSize(this.eraserSize);
-    }
-
-    // Only Pen activates / unhides a hidden canvas
-    if (!this.isCanvasVisible && toolName === 'pen') {
-      this.setCanvasVisibility(true);
-    }
-
-    const canvasContainer = document.getElementById('pen-hero-canvas-container');
-
-    // Update Monkey Button State
-    const monkeyBtn = document.getElementById('tb-btn-monkey');
-    const monkeyIcon = document.getElementById('tb-monkey-icon') || (monkeyBtn ? monkeyBtn.querySelector('span') : null);
-    if (toolName === 'select' || toolName === 'cursor') {
-      this.monkeyState = 'cursor';
-      if (monkeyIcon) monkeyIcon.textContent = '🐒';
-      if (monkeyBtn) monkeyBtn.title = 'Cursor Mode Active (Click to switch to Pen)';
-      if (canvasContainer) {
-        canvasContainer.style.pointerEvents = 'none';
-      }
-    } else {
-      this.monkeyState = 'active';
-      if (monkeyIcon) monkeyIcon.textContent = '🐵';
-      if (monkeyBtn) monkeyBtn.title = 'Active Ink Mode (Click to switch to Cursor)';
-      if (canvasContainer) {
-        canvasContainer.style.pointerEvents = 'auto';
-      }
-    }
-
-    // Update active toolbar button state
-    document.querySelectorAll('#pen-live-toolbar [data-tool]').forEach(btn => {
-      if (btn.dataset.tool === toolName) {
-        btn.classList.add('active');
-      } else {
-        btn.classList.remove('active');
-      }
-    });
-
-    // Update Shape menu button if a shape is active
-    const shapeBtn = document.getElementById('tb-btn-shapes');
-    if (shapeBtn) {
-      if (['line', 'arrow', 'rectangle', 'rounded_rectangle', 'circle', 'triangle'].includes(toolName)) {
-        shapeBtn.classList.add('active');
-      } else {
-        shapeBtn.classList.remove('active');
-      }
-    }
-
-    // Update canvas cursor
-    const stage = document.getElementById('canvas-stage-wrapper');
-    if (stage) {
-      stage.className = stage.className.replace(/\bcursor-\S+/g, '');
-      if (toolName === 'pen') stage.classList.add('cursor-pen');
-      else if (toolName === 'highlighter') stage.classList.add('cursor-highlighter');
-      else if (toolName === 'eraser') stage.classList.add('cursor-eraser');
-      else stage.classList.add('cursor-pointer');
-    }
-  }
-
-  selectColor(hex) {
-    this.currentColor = hex;
-    const currentTool = this.toolManager ? this.toolManager.currentTool : 'pen';
-    if (currentTool === 'highlighter') {
-      this.highlighterColor = hex;
-    } else {
-      this.penColor = hex;
-    }
-    if (this.toolManager) {
-      this.toolManager.setColor(hex);
-    }
-
-    document.querySelectorAll('.palette-color-btn').forEach(btn => {
-      if (btn.dataset.hex.toUpperCase() === hex.toUpperCase()) {
-        btn.classList.add('active');
-      } else {
-        btn.classList.remove('active');
-      }
-    });
-  }
-
-  setCanvasVisibility(visible) {
-    this.isCanvasVisible = visible;
-    const toolbar = document.getElementById('pen-live-toolbar');
-    const monkeyBtn = document.getElementById('tb-btn-monkey');
-    const monkeyIcon = document.getElementById('tb-monkey-icon') || (monkeyBtn ? monkeyBtn.querySelector('span') : null);
-    const canvasContainer = document.getElementById('pen-hero-canvas-container');
-
-    if (visible) {
-      if (toolbar) toolbar.classList.remove('collapsed');
-      if (canvasContainer) canvasContainer.style.display = 'block';
-      this.monkeyState = 'active';
-      if (monkeyIcon) monkeyIcon.textContent = '🐵';
-      if (monkeyBtn) monkeyBtn.title = 'Active Ink Mode (Click to switch to Cursor)';
-      this.showToast('Canvas Visible (Ctrl+Shift+2)', 'visibility');
-    } else {
-      if (toolbar) toolbar.classList.add('collapsed');
-      if (canvasContainer) canvasContainer.style.display = 'none';
-      this._closeAllPopovers();
-      this.monkeyState = 'hidden';
-      if (monkeyIcon) monkeyIcon.textContent = '🙈';
-      if (monkeyBtn) monkeyBtn.title = 'Canvas Hidden (Click to unhide)';
-      this.showToast('Canvas Hidden & Toolbar Collapsed (Ctrl+Shift+2)', 'visibility_off');
-    }
-  }
-
-  toggleCanvasVisibility() {
-    this.setCanvasVisibility(!this.isCanvasVisible);
-  }
-
-  togglePalette() {
-    const popover = document.getElementById('tb-palette-popover');
-    if (popover) {
-      const isOpen = popover.style.display === 'flex';
-      this._closeAllPopovers();
-      popover.style.display = isOpen ? 'none' : 'flex';
-      this.showToast(isOpen ? 'Color Palette Closed' : 'Color Palette Opened', 'palette');
-    }
-  }
-
-  cycleBackdrop() {
-    this.currentBackdropIndex = (this.currentBackdropIndex + 1) % this.backdropModes.length;
-    const mode = this.backdropModes[this.currentBackdropIndex];
-    const stage = document.getElementById('canvas-stage-wrapper');
-    if (stage) {
-      stage.classList.remove('canvas-backdrop-transparent', 'canvas-backdrop-whiteboard', 'canvas-backdrop-blackboard');
-      stage.classList.add(`canvas-backdrop-${mode}`);
-    }
-
-    const btn = document.getElementById('tb-btn-bg');
-    if (btn) {
-      const span = btn.querySelector('span');
-      if (mode === 'whiteboard') {
-        if (span) span.textContent = '⬛';
-        btn.title = 'Switch to Blackboard (Ctrl+B)';
-        btn.classList.add('active');
-        this.showToast('Switched to Whiteboard', 'crop_square');
-      } else if (mode === 'blackboard') {
-        if (span) span.textContent = '🖥️';
-        btn.title = 'Switch to Transparent Canvas (Ctrl+B)';
-        btn.classList.add('active');
-        this.showToast('Switched to Blackboard', 'square');
-      } else {
-        if (span) span.textContent = '⬜';
-        btn.title = 'Switch to Whiteboard (Ctrl+B)';
-        btn.classList.remove('active');
-        this.showToast('Switched to Transparent Canvas', 'desktop_windows');
-      }
-    }
-
-    if (this.canvasEngine) {
-      if (mode === 'transparent') {
-        this.canvasEngine.options.backgroundColor = 'rgba(0,0,0,0.008)';
-      } else if (mode === 'whiteboard') {
-        this.canvasEngine.options.backgroundColor = '#FFFFFF';
-      } else if (mode === 'blackboard') {
-        this.canvasEngine.options.backgroundColor = '#1a1e24';
-      }
-      this.canvasEngine.renderBackground?.();
-      this.canvasEngine.invalidate();
-    }
-    return mode;
   }
 
   // ==========================================
-  // 3. Theme Controls
+  // 1. Theme Controls
   // ==========================================
   _initThemeControls() {
-    document.querySelectorAll('[data-theme-mode]').forEach(btn => {
+    document.querySelectorAll('[data-theme-mode]').forEach((btn) => {
       btn.addEventListener('click', () => {
         const mode = btn.dataset.themeMode;
         if (!mode) return;
@@ -595,7 +40,7 @@ class App {
   }
 
   _updateThemeModeUI(mode) {
-    document.querySelectorAll('[data-theme-mode]').forEach(btn => {
+    document.querySelectorAll('[data-theme-mode]').forEach((btn) => {
       const isActive = btn.dataset.themeMode === mode;
       btn.classList.toggle('active', isActive);
       btn.setAttribute('aria-pressed', isActive ? 'true' : 'false');
@@ -603,27 +48,36 @@ class App {
   }
 
   // ==========================================
-  // 4. Navigation, App Bar Elevation & Active Tab Scroll Spy
+  // 2. Navigation, App Bar Elevation & Scroll Spy
   // ==========================================
   _initNavigation() {
     const topAppBar = document.querySelector('.m3-top-app-bar');
     if (topAppBar) {
-      window.addEventListener('scroll', () => {
-        if (window.scrollY > 20) {
-          topAppBar.classList.add('scrolled');
-        } else {
-          topAppBar.classList.remove('scrolled');
-        }
-      }, { passive: true });
+      let ticking = false;
+      const syncScrollState = () => {
+        topAppBar.classList.toggle('scrolled', window.scrollY > 20);
+        ticking = false;
+      };
+      window.addEventListener(
+        'scroll',
+        () => {
+          if (!ticking) {
+            ticking = true;
+            window.requestAnimationFrame(syncScrollState);
+          }
+        },
+        { passive: true }
+      );
+      syncScrollState();
     }
 
     const navItems = document.querySelectorAll('.m3-nav-bar .m3-nav-item, .m3-top-app-bar-nav a');
     const sections = document.querySelectorAll('section[id]');
+    const prefersReducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
 
-    // Function to synchronize active tab across mobile bottom nav & top app bar
     const setActiveNav = (sectionId) => {
       if (!sectionId) return;
-      navItems.forEach(item => {
+      navItems.forEach((item) => {
         const href = item.getAttribute('href');
         if (href === `#${sectionId}`) {
           item.classList.add('active');
@@ -637,82 +91,68 @@ class App {
       });
     };
 
-    // Smooth Anchor Navigation (Excluding Modal Triggers)
-    document.querySelectorAll('a[href^="#"]').forEach(anchor => {
+    document.querySelectorAll('a[href^="#"]').forEach((anchor) => {
       anchor.addEventListener('click', (e) => {
         const href = anchor.getAttribute('href');
         if (!href || href === '#') return;
 
-        // Skip modal popup triggers (handled by _initDownloadModal)
         if (anchor.classList.contains('btn-download-popup-trigger') || href === '#download-preference-modal') {
           return;
         }
 
         const target = document.querySelector(href);
-        if (target) {
-          e.preventDefault();
-          const targetId = target.id || (target.closest('section') ? target.closest('section').id : '');
-          if (targetId) setActiveNav(targetId);
+        if (!target) return;
 
-          const headerOffset = window.innerWidth <= 600 ? 56 : 68;
-          const elementPosition = target.getBoundingClientRect().top;
-          const offsetPosition = elementPosition + window.pageYOffset - headerOffset;
+        e.preventDefault();
+        const targetSection = target.closest('section');
+        const targetId = target.id || (targetSection ? targetSection.id : '');
+        if (targetId && targetId !== 'main-content') {
+          setActiveNav(targetId);
+        }
 
-          window.scrollTo({
-            top: Math.max(0, offsetPosition),
-            behavior: 'smooth'
-          });
+        const headerOffset = window.innerWidth <= 600 ? 56 : 68;
+        const offsetPosition = target.getBoundingClientRect().top + window.scrollY - headerOffset;
 
-          if (history.pushState) {
-            history.pushState(null, null, href);
-          }
+        window.scrollTo({
+          top: Math.max(0, offsetPosition),
+          behavior: prefersReducedMotion ? 'auto' : 'smooth'
+        });
+
+        if (target.id === 'main-content') {
+          target.focus({ preventScroll: true });
+        }
+
+        if (history.pushState) {
+          history.pushState(null, '', href);
         }
       });
     });
 
-    // High-Performance Scroll Spy using IntersectionObserver
     if ('IntersectionObserver' in window && sections.length > 0) {
-      const observer = new IntersectionObserver((entries) => {
-        const visibleEntries = entries.filter(e => e.isIntersecting);
-        if (visibleEntries.length > 0) {
-          visibleEntries.sort((a, b) => b.intersectionRatio - a.intersectionRatio);
-          setActiveNav(visibleEntries[0].target.id);
-        } else if (window.scrollY < 80) {
-          setActiveNav('hero');
+      const observer = new IntersectionObserver(
+        (entries) => {
+          const visibleEntries = entries.filter((entry) => entry.isIntersecting);
+          if (visibleEntries.length > 0) {
+            visibleEntries.sort((a, b) => b.intersectionRatio - a.intersectionRatio);
+            setActiveNav(visibleEntries[0].target.id);
+          } else if (window.scrollY < 80) {
+            setActiveNav('hero');
+          }
+        },
+        {
+          rootMargin: '-15% 0px -55% 0px',
+          threshold: [0, 0.25, 0.5, 0.75, 1.0]
         }
-      }, {
-        rootMargin: '-15% 0px -55% 0px',
-        threshold: [0, 0.25, 0.5, 0.75, 1.0]
-      });
+      );
 
-      sections.forEach(sec => observer.observe(sec));
+      sections.forEach((sec) => observer.observe(sec));
     }
   }
 
   // ==========================================
-  // 5. Shortcuts Matrix & Global Event Bus
+  // 3. Shortcuts Reference
   // ==========================================
   _initShortcuts() {
-    shortcutsManager.setContext({
-      canvasEngine: this.canvasEngine,
-      toolManager: this.toolManager,
-      historyManager: this.historyManager,
-      lassoSelector: this.lassoSelector,
-      selectTool: (tool) => {
-        if (tool === 'select') {
-          this.showRestrictedToast();
-          return;
-        }
-        this.selectTool(tool);
-      },
-      updateToolbarUI: (tool) => this.selectTool(tool),
-      showRestrictedToast: () => this.showRestrictedToast(),
-      toggleCanvasVisibility: () => this.toggleCanvasVisibility(),
-      togglePalette: () => this.togglePalette(),
-      cycleBackdrop: () => this.cycleBackdrop(),
-      showToast: (msg, icon) => this.showToast(msg, icon)
-    });
-
     const tableBody = document.getElementById('hotkey-table-body');
     const searchInput = document.getElementById('hotkey-search-input');
     const chipContainer = document.getElementById('hotkey-category-chips');
@@ -723,54 +163,82 @@ class App {
   }
 
   // ==========================================
-  // 6. GitHub Release Manager
+  // 4. GitHub Release Manager
   // ==========================================
   async _initGitHubReleases() {
     try {
       await gitHubReleaseManager.updateDOM();
-    } catch (e) {
-      console.warn('[App] GitHub release update DOM failed:', e);
+    } catch (err) {
+      console.warn('[App] GitHub release update DOM failed:', err);
     }
   }
 
   // ==========================================
-  // 7. Download Preference Modal
+  // 5. Accessible Native Download Dialog
   // ==========================================
   _initDownloadModal() {
     const modal = document.getElementById('download-preference-modal');
     const closeBtn = document.getElementById('close-download-modal');
     if (!modal) return;
 
+    const triggers = document.querySelectorAll('.btn-download-popup-trigger');
+    let lastTrigger = null;
+    let isDialogOpen = false;
+
+    const syncClosedState = () => {
+      if (!isDialogOpen) return;
+      isDialogOpen = false;
+      modal.classList.remove('active');
+      document.body.classList.remove('modal-open');
+      triggers.forEach((btn) => btn.setAttribute('aria-expanded', 'false'));
+      if (lastTrigger && typeof lastTrigger.focus === 'function') {
+        lastTrigger.focus({ preventScroll: true });
+        lastTrigger = null;
+      }
+    };
+
     const openModal = (e) => {
       if (e) e.preventDefault();
+      lastTrigger = e?.currentTarget || document.activeElement;
+      isDialogOpen = true;
+      triggers.forEach((btn) => btn.setAttribute('aria-expanded', 'true'));
       modal.classList.add('active');
-      modal.setAttribute('aria-hidden', 'false');
-      document.body.style.overflow = 'hidden';
+      document.body.classList.add('modal-open');
+
+      if (typeof modal.showModal === 'function' && !modal.open) {
+        modal.showModal();
+      } else {
+        modal.setAttribute('open', '');
+      }
+      if (closeBtn) closeBtn.focus({ preventScroll: true });
     };
 
     const closeModal = () => {
-      modal.classList.remove('active');
-      modal.setAttribute('aria-hidden', 'true');
-      document.body.style.overflow = '';
+      if (typeof modal.close === 'function' && modal.open) {
+        modal.close();
+      } else {
+        modal.removeAttribute('open');
+      }
+      syncClosedState();
     };
 
-    document.querySelectorAll('.btn-download-popup-trigger').forEach(btn => {
+    triggers.forEach((btn) => {
       btn.addEventListener('click', openModal);
     });
 
-    if (closeBtn) closeBtn.addEventListener('click', closeModal);
+    if (closeBtn) {
+      closeBtn.addEventListener('click', closeModal);
+    }
+
+    modal.addEventListener('close', syncClosedState);
 
     modal.addEventListener('click', (e) => {
-      if (e.target === modal) closeModal();
-    });
-
-    window.addEventListener('keydown', (e) => {
-      if (e.key === 'Escape' && modal.classList.contains('active')) {
+      if (e.target === modal) {
         closeModal();
       }
     });
 
-    modal.querySelectorAll('.download-option-card').forEach(card => {
+    modal.querySelectorAll('.download-option-card').forEach((card) => {
       card.addEventListener('click', () => {
         setTimeout(closeModal, 600);
       });
@@ -778,18 +246,9 @@ class App {
   }
 
   // ==========================================
-  // 8. Toast Notification System
+  // 6. Toast Notification System (Safe DOM, CSP-Clean)
   // ==========================================
-  showRestrictedToast() {
-    this.showToast(
-      'This feature is exclusive to the Windows Desktop App',
-      'lock',
-      '<a href="https://github.com/Narayan6204/Pen-11/releases/latest" class="m3-btn m3-btn-filled" style="height: 32px; font-size: 12px; padding: 0 12px; text-decoration: none; background: var(--md-sys-color-primary); color: var(--md-sys-color-on-primary); white-space: nowrap; flex-shrink: 0;">Download</a>',
-      4000
-    );
-  }
-
-  showToast(message, icon = 'info', actionHtml = '', durationMs = null) {
+  showToast(message, icon = 'info', durationMs = 2000) {
     let snackbar = document.getElementById('m3-global-snackbar');
     if (!snackbar) {
       snackbar = document.createElement('aside');
@@ -797,50 +256,59 @@ class App {
       snackbar.className = 'm3-snackbar';
       snackbar.setAttribute('role', 'status');
       snackbar.setAttribute('aria-live', 'polite');
-      snackbar.innerHTML = `
-        <div class="m3-snackbar-content">
-          <span class="material-symbols-rounded" id="m3-snackbar-icon" style="font-size: 20px; flex-shrink: 0;">info</span>
-          <span id="m3-snackbar-text" class="m3-snackbar-text">Notification</span>
-        </div>
-        <div class="m3-snackbar-actions">
-          <div id="m3-snackbar-action" style="display: flex; align-items: center;"></div>
-          <button class="m3-btn m3-btn-text" id="m3-snackbar-dismiss" style="color: var(--md-sys-color-inverse-primary); padding: 0 8px; height: 32px; flex-shrink: 0;">DISMISS</button>
-        </div>
-      `;
-      document.body.appendChild(snackbar);
 
-      snackbar.querySelector('#m3-snackbar-dismiss').addEventListener('click', () => {
+      const content = document.createElement('div');
+      content.className = 'm3-snackbar-content';
+
+      const iconEl = document.createElement('span');
+      iconEl.id = 'm3-snackbar-icon';
+      iconEl.className = 'material-symbols-rounded m3-snackbar-icon';
+      iconEl.setAttribute('aria-hidden', 'true');
+      iconEl.textContent = 'info';
+
+      const textEl = document.createElement('span');
+      textEl.id = 'm3-snackbar-text';
+      textEl.className = 'm3-snackbar-text';
+      textEl.textContent = 'Notification';
+
+      content.append(iconEl, textEl);
+
+      const actions = document.createElement('div');
+      actions.className = 'm3-snackbar-actions';
+
+      const dismissBtn = document.createElement('button');
+      dismissBtn.type = 'button';
+      dismissBtn.id = 'm3-snackbar-dismiss';
+      dismissBtn.className = 'm3-btn m3-btn-text m3-snackbar-dismiss';
+      dismissBtn.textContent = 'DISMISS';
+      dismissBtn.addEventListener('click', () => {
         snackbar.classList.remove('active');
       });
+
+      actions.appendChild(dismissBtn);
+      snackbar.append(content, actions);
+      document.body.appendChild(snackbar);
     }
 
     const textEl = snackbar.querySelector('#m3-snackbar-text');
     const iconEl = snackbar.querySelector('#m3-snackbar-icon');
-    const actionEl = snackbar.querySelector('#m3-snackbar-action');
     if (textEl) textEl.textContent = message;
     if (iconEl) iconEl.textContent = icon;
-    
-    if (actionEl) {
-      actionEl.innerHTML = actionHtml || '';
-      actionEl.style.display = actionHtml ? 'flex' : 'none';
-    }
 
     snackbar.classList.add('active');
-
-    const timeout = durationMs || (actionHtml ? 3500 : 2000);
 
     if (this.toastTimer) clearTimeout(this.toastTimer);
     this.toastTimer = setTimeout(() => {
       snackbar.classList.remove('active');
-    }, timeout);
+    }, durationMs);
   }
 }
 
-// Instantiate and Boot App on DOM Ready or Immediately if Parsed
 const bootApp = async () => {
   try {
     const app = new App();
     await app.init();
+    window.pen11App = app;
     window.__PEN11_APP_LOADED__ = true;
   } catch (err) {
     console.error('[Pen 11] App initialization error:', err);

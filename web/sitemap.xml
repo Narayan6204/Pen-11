@@ -3,9 +3,14 @@
         xmlns:image="http://www.google.com/schemas/sitemap-image/1.1">
   <url>
     <loc>https://pen-11.pages.dev/</loc>
-    <lastmod>2026-10-21</lastmod>
+    <lastmod>2026-11-26</lastmod>
     <changefreq>weekly</changefreq>
     <priority>1.0</priority>
+    <image:image>
+      <image:loc>https://pen-11.pages.dev/assets/og-preview.jpg</image:loc>
+      <image:title>Pen 11 — Free Screen Annotation Tool and Marker for Windows 11</image:title>
+      <image:caption>Pen 11 floating toolbar and 12-color palette preview</image:caption>
+    </image:image>
     <image:image>
       <image:loc>https://pen-11.pages.dev/assets/screenshot.png</image:loc>
       <image:title>Pen 11 Screen Annotation Tool for Windows 11</image:title>

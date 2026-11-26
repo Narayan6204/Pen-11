@@ -1,8 +1,30 @@
 /* ==========================================================================
    PEN 11 DESIGN SYSTEM - 03-MOTION.CSS
-   Material Design 3 Physics Curves, State Layers, Dynamic Radial Ink Ripples,
+   Material Design 3 Physics Curves, State Layers,
    Container Morphs, Staggered Reveals & Accessibility Fallbacks
    ========================================================================== */
+
+/* Skip-to-Content Keyboard Accessibility Link */
+.skip-to-content {
+  position: fixed;
+  top: 12px;
+  left: 12px;
+  z-index: 2100;
+  padding: 10px 18px;
+  border-radius: var(--md-sys-shape-corner-full);
+  background-color: var(--md-sys-color-primary);
+  color: var(--md-sys-color-on-primary);
+  font-family: var(--md-sys-typescale-label-large-font);
+  font-size: var(--md-sys-typescale-label-large-size);
+  font-weight: 700;
+  box-shadow: var(--md-sys-elevation-level3);
+  transform: translateY(-200%);
+  transition: transform var(--md-sys-motion-duration-short3) var(--md-sys-motion-easing-emphasized-decelerate);
+}
+
+.skip-to-content:focus-visible {
+  transform: translateY(0);
+}
 
 /* --------------------------------------------------------------------------
    1. Universal Interactive State Layer & Radial Ink Ripple
