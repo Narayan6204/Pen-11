@@ -107,12 +107,16 @@ jobs:
 
           (async () => {
             const browser = await chromium.launch();
-            for (const vp of [
+            const viewports = [
               { name: 'desktop', width: 1280, height: 800 },
               { name: 'tablet', width: 768, height: 1024 },
               { name: 'mobile', width: 375, height: 812 }
-            ]) {
-              const page = await browser.newPage({ viewport: vp });
+            ];
+
+            // Phase 1: Verify strict CSP, zero console/page errors, zero overflow & interactions
+            for (const vp of viewports) {
+              const ctx = await browser.newContext({ viewport: vp, bypassCSP: false });
+              const page = await ctx.newPage();
               await page.route('https://api.github.com/**', (route) =>
                 route.fulfill({
                   status: 200,
@@ -120,11 +124,55 @@ jobs:
                   body: JSON.stringify({ tag_name: 'v2.2.0', assets: [] })
                 })
               );
+              await page.addInitScript(() => {
+                window.__cspViolations = [];
+                document.addEventListener('securitypolicyviolation', (e) => {
+                  window.__cspViolations.push(`${e.violatedDirective}: ${e.blockedURI}`);
+                });
+              });
               const errors = [];
               page.on('pageerror', (e) => errors.push(`pageerror: ${e.message}`));
               page.on('console', (m) => {
                 if (m.type() === 'error') errors.push(`console.error: ${m.text()}`);
               });
+
+              await page.goto('http://localhost:3000/', { waitUntil: 'load' });
+              await page.evaluate(() => document.fonts.ready);
+
+              for (const mode of ['light', 'dark']) {
+                if (mode === 'dark') {
+                  await page.click('[data-theme-mode="dark"]');
+                  await page.waitForTimeout(250);
+                }
+                const overflow = await page.evaluate(
+                  () => document.documentElement.scrollWidth - document.documentElement.clientWidth
+                );
+                if (overflow > 1) {
+                  throw new Error(`Horizontal overflow (${overflow}px) at ${vp.name} (${mode})`);
+                }
+              }
+
+              const cspViolations = await page.evaluate(() => window.__cspViolations);
+              if (cspViolations.length) {
+                throw new Error(`CSP violations at ${vp.name}: ${cspViolations.join('; ')}`);
+              }
+              if (errors.length) {
+                throw new Error(`Runtime errors at ${vp.name}: ${errors.join('; ')}`);
+              }
+              await ctx.close();
+            }
+
+            // Phase 2: WCAG 2.2 AA audit across Light & Dark themes (bypassCSP allows axe-core CSS fetch)
+            for (const vp of viewports) {
+              const ctx = await browser.newContext({ viewport: vp, bypassCSP: true });
+              const page = await ctx.newPage();
+              await page.route('https://api.github.com/**', (route) =>
+                route.fulfill({
+                  status: 200,
+                  contentType: 'application/json',
+                  body: JSON.stringify({ tag_name: 'v2.2.0', assets: [] })
+                })
+              );
               await page.goto('http://localhost:3000/', { waitUntil: 'load' });
               await page.evaluate(() => document.fonts.ready);
 
@@ -132,12 +180,6 @@ jobs:
                 if (mode === 'dark') {
                   await page.click('[data-theme-mode="dark"]');
                   await page.waitForTimeout(300);
-                }
-                const overflow = await page.evaluate(
-                  () => document.documentElement.scrollWidth - document.documentElement.clientWidth
-                );
-                if (overflow > 1) {
-                  throw new Error(`Horizontal overflow (${overflow}px) at ${vp.name} (${mode})`);
                 }
                 const axeResults = await new AxeBuilder({ page })
                   .withTags(['wcag2a', 'wcag2aa', 'wcag21aa', 'wcag22aa'])
@@ -149,14 +191,11 @@ jobs:
                   throw new Error(`Axe violations at ${vp.name} (${mode}): ${JSON.stringify(blocking, null, 2)}`);
                 }
               }
-
-              if (errors.length) {
-                throw new Error(`Runtime errors at ${vp.name}: ${errors.join('; ')}`);
-              }
-              await page.close();
+              await ctx.close();
             }
+
             await browser.close();
-            console.log('Playwright + Axe WCAG 2.2 AA checks passed across Light & Dark viewports.');
+            console.log('Playwright Strict CSP & Axe WCAG 2.2 AA checks passed across Light & Dark viewports.');
           })().catch((err) => {
             console.error(err);
             process.exit(1);
