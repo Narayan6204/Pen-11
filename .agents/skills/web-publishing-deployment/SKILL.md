@@ -8,7 +8,7 @@ description: >-
 
 # Web Publishing & Deployment Skill
 
-This skill provides turnkey CI/CD workflows, infrastructure configs, DNS management blueprints, and caching policies for publishing web applications with 99.99% availability and instant global CDN propagation.
+Turnkey CI/CD workflows, CDN configs, DNS blueprints, caching policies, and PWA manifests for publishing web apps gated by automated quality checks.
 
 ---
 
@@ -16,18 +16,22 @@ This skill provides turnkey CI/CD workflows, infrastructure configs, DNS managem
 
 | Platform | Best For | SSL/TLS | Custom Domain | Preview Channels | Config File |
 | :--- | :--- | :--- | :--- | :--- | :--- |
-| **GitHub Pages** | Open-source, docs, client-side SPAs | Automated (Let's Encrypt) | Supported (`CNAME` file or repo settings) | Environment-based | `.github/workflows/deploy.yml` |
-| **Firebase Hosting** | Full-stack web apps, dynamic routing, Auth/Firestore | Automated (Google CA) | Supported (1-click verification) | `firebase hosting:channel:deploy` | `firebase.json` |
-| **Cloudflare Pages** | High-traffic static sites, edge functions | Automated (Universal SSL) | Supported (Direct DNS proxy) | Branch previews | `_headers`, `_routes.json` |
-| **Vercel / Netlify** | Next.js, Vite, serverless microfrontends | Automated | Supported | Automated PR previews | `vercel.json` / `netlify.toml` |
+| **GitHub Pages** | Docs, static exports, client SPAs | Automated (Let's Encrypt) | Supported (`CNAME` + DNS) | Environment-based | `.github/workflows/deploy.yml` |
+| **Firebase Hosting** | Static/SPA + Firebase Auth/Firestore | Automated (Google CA) | Supported (`TXT` + `A`) | `firebase hosting:channel:deploy` | `firebase.json` |
+| **Cloudflare Pages** | High-traffic static sites, edge functions | Automated (Universal SSL) | Supported (DNS proxy) | Branch & PR previews | `_headers`, `_routes.json` |
+| **Vercel / Netlify** | Next.js RSC/SSR, Vite, serverless | Automated | Supported | Automated PR previews | `vercel.json` / `netlify.toml` |
 
 ---
 
-## 2. GitHub Pages Deployment via GitHub Actions (Zero External Dependencies)
+## 2. GitHub Pages Deployment via GitHub Actions
 
-Create `.github/workflows/deploy.yml`:
+Always gate deployment behind CI quality checks (`needs: [quality-gates]`) and upload **only** your explicit build output (`./dist`, `./out`, or `./web`).
+
+> [!CAUTION]
+> **NEVER deploy repository root (`path: '.'`).** Deploying `.` exposes `.git/`, `.env*`, `.agents/`, source code, and workflow files on the public internet.
 
 ```yaml
+# .github/workflows/deploy.yml
 name: Deploy Web Application to GitHub Pages
 
 on:
@@ -41,42 +45,66 @@ permissions:
   id-token: write
 
 concurrency:
-  group: "pages"
+  group: pages
   cancel-in-progress: true
 
 jobs:
-  build-and-deploy:
+  quality-gates:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: 'npm'
+      - run: npm ci
+      - run: npm run lint
+      - run: npx tsc --noEmit
+      - run: npx vitest run --coverage
+      - run: npm run build
+      - uses: actions/upload-artifact@v4
+        with:
+          name: dist-bundle
+          path: ./dist
+          retention-days: 1
+
+  deploy:
+    needs: [quality-gates]
     environment:
       name: github-pages
       url: ${{ steps.deployment.outputs.page_url }}
     runs-on: ubuntu-latest
     steps:
-      - name: Checkout repository
-        uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
+        with:
+          name: dist-bundle
+          path: ./dist
 
       - name: Setup Pages
-        uses: actions/configure-pages@v4
+        uses: actions/configure-pages@v5
 
-      - name: Upload artifact (Static files)
+      - name: Upload Pages artifact (explicit build output only)
         uses: actions/upload-pages-artifact@v3
         with:
-          path: '.' # Or './dist' for Vite / Next export
+          path: ./dist
 
       - name: Deploy to GitHub Pages
         id: deployment
         uses: actions/deploy-pages@v4
 ```
 
+For full Docker-parity Playwright & Lighthouse CI gates, see [`ci-testing-docker-gates.md`](../web-engineering-standards/references/ci-testing-docker-gates.md).
+
 ---
 
 ## 3. Firebase Hosting Configuration (`firebase.json`)
 
-Configure high-performance cache headers and single-page routing:
+Apply `immutable` caching **only** to fingerprinted/hashed assets—never to unhashed JS/CSS files:
 
 ```json
 {
   "hosting": {
-    "public": "public",
+    "public": "dist",
     "ignore": [
       "firebase.json",
       "**/.*",
@@ -90,7 +118,16 @@ Configure high-performance cache headers and single-page routing:
     ],
     "headers": [
       {
-        "source": "**/*.@(js|css|woff2|webp|png|svg)",
+        "source": "/assets/**",
+        "headers": [
+          {
+            "key": "Cache-Control",
+            "value": "public, max-age=31536000, immutable"
+          }
+        ]
+      },
+      {
+        "source": "**/*.[0-9a-f]*.@(js|css|woff2|webp|png|svg)",
         "headers": [
           {
             "key": "Cache-Control",
@@ -112,20 +149,73 @@ Configure high-performance cache headers and single-page routing:
 }
 ```
 
+> [!WARNING]
+> **SPA Rewrite Caveat**: Firebase checks real files before applying `rewrites`, so missing or stale hashed chunks from an earlier deploy fall through `"source": "**"` and return `/index.html` (`200 OK`, `text/html`), triggering strict MIME-type errors in browsers. Handle `vite:preloadError` / chunk load errors with a reload prompt or retain prior hashed bundles briefly across rolling deploys.
+
 ---
 
-## 4. Custom Domain & DNS Configuration
+## 4. Cloudflare Pages Blueprint (`wrangler` + `_headers`)
+
+Deploy an explicit build directory via pinned CLI (`wrangler`):
+
+```bash
+npx wrangler pages deploy ./dist --project-name=my-web-app
+```
+
+Place `_headers` inside your build output (`public/_headers` copied to `./dist/_headers`):
+
+```text
+/assets/*
+  Cache-Control: public, max-age=31536000, immutable
+
+/*.html
+  Cache-Control: public, max-age=0, must-revalidate
+
+/*
+  Strict-Transport-Security: max-age=63072000; includeSubDomains; preload
+  X-Content-Type-Options: nosniff
+  Referrer-Policy: strict-origin-when-cross-origin
+  Permissions-Policy: camera=(), microphone=(), geolocation=()
+```
+
+---
+
+## 5. PWA Manifest (`public/manifest.webmanifest`)
+
+Reference from HTML `<head>` via `<link rel="manifest" href="/manifest.webmanifest">`:
+
+```json
+{
+  "name": "Web App Studio",
+  "short_name": "Studio",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#ffffff",
+  "theme_color": "#0061a4",
+  "icons": [
+    { "src": "/icons/icon-192.png", "sizes": "192x192", "type": "image/png" },
+    { "src": "/icons/icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any maskable" }
+  ]
+}
+```
+
+---
+
+## 6. Custom Domain & DNS Configuration
 
 | Record Type | Host / Name | Target / Value | TTL |
 | :--- | :--- | :--- | :--- |
-| **CNAME** | `www` or subdomain (`app`) | `<username>.github.io` or `hosting.firebaseapp.com` | `300` / Automatic |
-| **A** | `@` (Root Apex Domain) | `185.199.108.153`<br>`185.199.109.153`<br>`185.199.110.153`<br>`185.199.111.153` (GitHub Pages) | `300` |
-| **TXT** | `_github-pages-challenge-...` | Verification token for domain ownership | `300` |
+| **CNAME** | `www` or subdomain (`app`) | `<username>.github.io` or `<project>.pages.dev` | `300` / Auto |
+| **A** | `@` (Root Apex Domain) | GitHub Pages: `185.199.108.153`, `185.199.109.153`, `185.199.110.153`, `185.199.111.153` | `300` |
+| **TXT** | `_github-pages-challenge-<user>` or `@` | Provider domain verification token | `300` |
+
+For Firebase Hosting's site-specific `A`/`TXT` DNS workflow and SSL provisioning, see `./references/firebase-hosting-custom-domain.md`.
 
 ---
 
-## 5. Cross-References & Detailed Modules
+## 7. Cross-References & Detailed Modules
 
-- [`github-actions-deploy.md`](file:///c:/Users/krish/OneDrive/Documents/Anitgravity%20Projects/Pen%2011/.agents/skills/web-publishing-deployment/references/github-actions-deploy.md) — Multi-environment workflows, secret masking, and automated staging/prod triggers.
-- [`firebase-hosting-custom-domain.md`](file:///c:/Users/krish/OneDrive/Documents/Anitgravity%20Projects/Pen%2011/.agents/skills/web-publishing-deployment/references/firebase-hosting-custom-domain.md) — CLI deploy steps, preview channels, and Firebase custom domain provisioning.
-- [`caching-cdn-headers.md`](file:///c:/Users/krish/OneDrive/Documents/Anitgravity%20Projects/Pen%2011/.agents/skills/web-publishing-deployment/references/caching-cdn-headers.md) — Cache-Control heuristics, immutable hashing, CSP headers, and Service Worker cache strategies.
+- [`github-actions-deploy.md`](./references/github-actions-deploy.md) — Node 22 CI/CD pipelines, Docker parity gates, concurrency, and secret masking.
+- [`firebase-hosting-custom-domain.md`](./references/firebase-hosting-custom-domain.md) — Pinned CLI deploys, gated preview/live channels, and custom domain DNS + SSL provisioning.
+- [`caching-cdn-headers.md`](./references/caching-cdn-headers.md) — `Cache-Control` policies, nonce/SHA-256 CSP headers (zero `'unsafe-inline'`), and Service Worker caching.
+- [`web-engineering-standards`](../web-engineering-standards/SKILL.md) — Core 2026 engineering standards, TypeScript strictness, OWASP, and quality gates.

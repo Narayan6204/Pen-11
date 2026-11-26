@@ -19,7 +19,7 @@ Material You (M3) centers on **personalization, adaptivity, and expressive surfa
 1. **Dynamic Color & HCT**: Color is generated dynamically from seed/wallpaper colors using the Hue-Chroma-Tone (HCT) color space, generating 5 core tonal palettes (Primary, Secondary, Tertiary, Neutral, Neutral Variant) with guaranteed contrast ratios.
 2. **Surface Elevation via Tints & Containers**: Instead of relying purely on heavy drop shadows, M3 uses surface container tiers (`surface-container-lowest` to `surface-container-highest`) and translucent primary surface tint overlays.
 3. **State Layers & Interactive Ripples**: Hover, focus, press, and drag states use semi-transparent overlays on top of the container, plus dynamic radial ink ripples.
-4. **Adaptive Navigation**: Breakpoint-driven navigation transitioning seamlessly between Mobile Bottom Navigation Bar (<600px), Tablet Navigation Rail (600–840px), and Desktop Navigation Drawer (>840px).
+4. **Adaptive Navigation**: Breakpoint-driven navigation transitioning seamlessly between Mobile Bottom Navigation Bar (`< 600px`), Tablet Navigation Rail (`600–839px`), and Desktop Navigation Drawer (`>= 840px`).
 5. **Expressive Motion**: Custom cubic-bezier easings (Emphasized, Standard) and container morphing transitions.
 
 ---
@@ -168,7 +168,7 @@ Always structure CSS using the official M3 token hierarchy:
 
 ## 3. Typography Scale
 
-Use Google Fonts (`Roboto`, `Roboto Flex`, or `Plus Jakarta Sans` / `Google Sans`).
+Use Google Fonts or self-hosted WOFF2 (`Plus Jakarta Sans`, `Roboto Flex`, or `Roboto`) with metric-matched fallback.
 
 | Role | Font Size | Line Height | Tracking (Letter Spacing) | Weight |
 | :--- | :--- | :--- | :--- | :--- |
@@ -219,6 +219,11 @@ Use Google Fonts (`Roboto`, `Roboto Flex`, or `Plus Jakarta Sans` / `Google Sans
   opacity: var(--md-sys-state-hover-opacity);
 }
 
+.m3-interactive:focus-visible {
+  outline: 3px solid var(--md-sys-color-primary);
+  outline-offset: 2px;
+}
+
 .m3-interactive:focus-visible::before {
   opacity: var(--md-sys-state-focus-opacity);
 }
@@ -230,12 +235,12 @@ Use Google Fonts (`Roboto`, `Roboto Flex`, or `Plus Jakarta Sans` / `Google Sans
   opacity: var(--md-sys-state-pressed-opacity);
   transform: scale(0);
   pointer-events: none;
-  animation: m3-ripple 400ms var(--md-sys-motion-easing-standard-decelerate) forwards;
+  animation: m3-ripple 350ms var(--md-sys-motion-easing-emphasized-decelerate) forwards;
 }
 
 @keyframes m3-ripple {
   to {
-    transform: scale(4);
+    transform: scale(1);
     opacity: 0;
   }
 }
@@ -244,17 +249,18 @@ Use Google Fonts (`Roboto`, `Roboto Flex`, or `Plus Jakarta Sans` / `Google Sans
 ```javascript
 function attachM3Ripple(element) {
   element.addEventListener('pointerdown', (e) => {
+    if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) return;
     const rect = element.getBoundingClientRect();
     const ripple = document.createElement('span');
     ripple.classList.add('m3-ripple-ink');
-    const size = Math.max(rect.width, rect.height);
+    const size = Math.max(rect.width, rect.height) * 2;
     const x = e.clientX - rect.left - size / 2;
     const y = e.clientY - rect.top - size / 2;
     ripple.style.width = ripple.style.height = `${size}px`;
     ripple.style.left = `${x}px`;
     ripple.style.top = `${y}px`;
     element.appendChild(ripple);
-    setTimeout(() => ripple.remove(), 450);
+    setTimeout(() => ripple.remove(), 400);
   });
 }
 ```
@@ -272,9 +278,12 @@ function attachM3Ripple(element) {
 
 ---
 
-## 6. Dynamic Color Generator (HCT Integration)
+## 6. Dynamic Color Generator & Cross-References
 
-To enable client-side Material You dynamic color generation from a single HEX seed or image:
+To enable client-side Material You dynamic color generation, accessible components, and 2026 engineering standards:
 - Reference: [Dynamic Color & Tokens Details](./references/tokens-and-color.md)
-- Components Guide: [Full Components Specs](./references/components-guide.md)
+- Components Guide: [Full Components Specs](./references/components-guide.md) (WCAG 2.2 keyboard-accessible switch, `aria-label` icon buttons, GPU transitions)
 - Motion & Elevation: [Motion & Transitions Guide](./references/motion-and-elevation.md)
+- Interactive Showcase: [CSP-Clean M3 Showcase Example](./examples/m3-showcase.html)
+- Color Theory & Contrast: [UI Color Theory & OKLCH/APCA](../ui-color-theory/SKILL.md)
+- Engineering & Quality Gates: [2026 Web Engineering Standards](../web-engineering-standards/SKILL.md)

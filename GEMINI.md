@@ -22,13 +22,16 @@
 
 ## 3. Default Web Design & Development Standard: Material Design 3 & Web Lifecycle Suite
 Whenever the user requests to build, design, style, or refactor any website, web application, dashboard, or UI component:
-- **Mandatory Default**: ALWAYS default to **Material Design 3 (Material You / m3.material.io)** principles.
+- **Mandatory Default**: ALWAYS default to **Material Design 3 (Material You / m3.material.io)** principles and 2026 web engineering standards.
 - **Skill Suite Orchestration**:
   1. **Core M3 Design System**: Follow `.agents/skills/material-you-web/SKILL.md`.
-  2. **Planning & IA**: Follow `.agents/skills/web-design-planning/SKILL.md` (wireframing, layout architecture, typography hierarchy, user journeys, component mapping).
-  3. **Motion & Interaction**: Follow `.agents/skills/web-animation-mastery/SKILL.md` (GPU acceleration, canvas drawing engines, M3 bezier curves, container morphs, scroll-driven animations).
-  4. **SEO, Performance & A11y**: Follow `.agents/skills/web-seo-performance-a11y/SKILL.md` (Lighthouse 100, Core Web Vitals LCP/INP/CLS, WCAG 2.2 AA/AAA, ARIA, structured JSON-LD).
-  5. **Publishing & Deployment**: Follow `.agents/skills/web-publishing-deployment/SKILL.md` (GitHub Pages via Actions, Firebase Hosting, custom domain DNS, cache headers, SSL/TLS).
+  2. **Color Theory & Contrast**: Follow `.agents/skills/ui-color-theory/SKILL.md` (HCT/OKLCH perceptual color spaces, WCAG/APCA contrast math).
+  3. **Planning & IA**: Follow `.agents/skills/web-design-planning/SKILL.md` (wireframing, layout architecture, per-route SSG/RSC/SSR strategy, 15-tier M3 typography, device budgets, component mapping).
+  4. **Motion & Interaction**: Follow `.agents/skills/web-animation-mastery/SKILL.md` (GPU acceleration, canvas drawing engines, M3 bezier curves, container morphs, scroll-driven animations, INP & WCAG 2.2 motion rules).
+  5. **SEO, Performance & A11y**: Follow `.agents/skills/web-seo-performance-a11y/SKILL.md` (CWV CI budgets LCP `<= 2.5s` / INP `< 200ms` / CLS `< 0.1`, WCAG 2.2 AA/AAA `@axe-core/playwright` + manual audits, AI Overviews & JSON-LD).
+  6. **2026 Engineering Standards & Quality Gates**: Follow `.agents/skills/web-engineering-standards/SKILL.md` (TypeScript `strict: true`, React/Next.js boundaries, pragmatic DRY, ESLint/Prettier, trunk-based Git + Conventional Commits, Vitest/Playwright/Docker CI parity, OWASP Top 10, Dependabot/Snyk/`gitleaks`, AI code review guardrails).
+  7. **Publishing & Deployment**: Follow `.agents/skills/web-publishing-deployment/SKILL.md` (GitHub Actions CI-gated deploys, Cloudflare Pages, Firebase Hosting, custom domain DNS, cache headers, nonce/SHA-256 CSP, PWA/SW).
+  - **Live Platform APIs**: Coordinate with global `modern-web-guidance` first for modern HTML/CSS/client JS Baseline lookups.
 - **Color & Theming**:
   - Implement dynamic HCT / tonal color palettes (Primary, Secondary, Tertiary, Neutral, Neutral Variant).
   - Define CSS custom properties with the full `--md-sys-color-*` token specification for both Light and Dark themes.
@@ -39,7 +42,7 @@ Whenever the user requests to build, design, style, or refactor any website, web
   - Use Google Fonts (Plus Jakarta Sans, Roboto Flex, or Roboto) with the official 15-tier M3 type scale (Display, Headline, Title, Body, Label).
   - Use surface tinting and multi-layer elevation shadows (Levels 0–5).
 - **Navigation**:
-  - Use adaptive navigation patterns: Navigation Bar for mobile (<600px), Navigation Rail for tablet (600–840px), and Navigation Drawer for desktop (>840px).
+  - Use adaptive navigation patterns: Navigation Bar for mobile (`< 600px`), Navigation Rail for tablet (`600–839px`), and Navigation Drawer for desktop (`>= 840px`).
 
 ## 4. Animation & Desktop Rules (Pen 11 App)
 - **PyQt6 Animations**: Before writing any animation code in `main.py` (transitions, collapse/expand, fades, slides), strictly follow `.agents/skills/pyqt-animation-skill/SKILL.md`.

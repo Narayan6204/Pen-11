@@ -13,7 +13,7 @@ This reference details the mathematical physics and CSS implementations of M3 mo
 | `emphasized-decelerate` | `cubic-bezier(0.05, 0.7, 0.1, 1.0)` | Smooth landing into view | Incoming tooltips, toasts, drawer slide-in |
 | `standard` | `cubic-bezier(0.2, 0.0, 0, 1.0)` | Natural, balanced motion | Button hover, icon state shifts, color transitions |
 | `standard-accelerate` | `cubic-bezier(0.3, 0, 1, 1)` | Direct exit | Fade outs, collapsed menu closing |
-| `standard-decelerate` | `cubic-bezier(0, 0, 0, 1)` | Direct entry | Fade ins, dropdown opens |
+| `standard-decelerate` | `cubic-bezier(0.0, 0.0, 0.2, 1.0)` | Direct entry | Fade ins, dropdown opens |
 
 ---
 
@@ -47,9 +47,9 @@ CSS `linear()` allows true spring physics directly in stylesheets without runtim
 
 ---
 
-## 3. `prefers-reduced-motion` Compliance
+## 3. `prefers-reduced-motion` Compliance (CSS & JS)
 
-Always wrap motion with reduced-motion fallbacks for accessibility:
+Always wrap CSS transitions and guard JS motion helpers against reduced motion preferences:
 
 ```css
 @media (prefers-reduced-motion: reduce) {
@@ -61,5 +61,11 @@ Always wrap motion with reduced-motion fallbacks for accessibility:
     transition-duration: 0.01ms !important;
     scroll-behavior: auto !important;
   }
+}
+```
+
+```javascript
+export function canAnimate() {
+  return !window.matchMedia('(prefers-reduced-motion: reduce)').matches;
 }
 ```

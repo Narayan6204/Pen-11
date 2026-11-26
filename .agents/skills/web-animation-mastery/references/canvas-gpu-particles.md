@@ -16,6 +16,8 @@ class ParticleSystem {
   }
 
   emit(x, y, count = 20, color = '#0061A4') {
+    if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) return;
+
     for (let i = 0; i < count; i++) {
       const angle = Math.random() * Math.PI * 2;
       const speed = Math.random() * 4 + 1;
@@ -27,14 +29,23 @@ class ParticleSystem {
         radius: Math.random() * 3 + 2,
         alpha: 1.0,
         decay: Math.random() * 0.03 + 0.015,
-        color
+        color,
       });
     }
     if (!this.animId) this.loop();
   }
 
   loop() {
+    if (document.hidden) {
+      this.animId = null;
+      return;
+    }
+
+    // Clear raw pixel buffer safely regardless of active DPR transform
+    this.ctx.save();
+    this.ctx.setTransform(1, 0, 0, 1, 0, 0);
     this.ctx.clearRect(0, 0, this.canvas.width, this.canvas.height);
+    this.ctx.restore();
 
     for (let i = this.particles.length - 1; i >= 0; i--) {
       const p = this.particles[i];

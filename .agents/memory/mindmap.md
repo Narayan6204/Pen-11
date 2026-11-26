@@ -1,5 +1,5 @@
 # Pen 11 — Project Mind Map
-> Last Updated: 2026-09-21
+> Last Updated: 2026-11-12
 
 ---
 
@@ -7,7 +7,7 @@
 
 Pen 11 is a **Windows-only transparent fullscreen overlay drawing application** built in Python/PyQt6.
 It lets users draw, annotate, and select vector objects directly on top of any running application.
-A companion Material Design 3 web landing page & interactive canvas demo (hosted via Cloudflare Pages at https://pen-11.pages.dev/) mirrors the core canvas features.
+A companion Material Design 3 web landing page (hosted via Cloudflare Pages at https://pen-11.pages.dev/) presents the product, features, documentation, release links, and responsive UI.
 
 ---
 
@@ -23,36 +23,39 @@ Pen 11/
 +-- serve.js             Zero-dep Node.js local dev server for web/ preview (1.5 KB)
 +-- test_crash.py        Headless unit test for vector selection & rotation (2 KB)
 +-- web/
-|   +-- index.html       M3 landing page + live HTML5 canvas demo
+|   +-- index.html           M3 landing page, Schema.org graph (with HowTo/FAQPage), native <dialog>, zero inline styles
+|   +-- manifest.webmanifest PWA web app manifest (192/512 PNG + SVG icons)
+|   +-- _headers             Cloudflare Pages strict zero-'unsafe-inline' CSP & security/cache headers
 |   +-- css/
 |   |   +-- index.css          CSS barrel aggregator
-|   |   +-- 00-tokens.css      M3 design tokens (HCT palettes, type scale, elevation)
-|   |   +-- 01-layout.css      Responsive layouts & container queries
-|   |   +-- 02-components.css  M3 UI components (buttons, cards, chips)
-|   |   +-- 03-motion.css      Keyframe animations & micro-interactions
-|   |   +-- 04-canvas.css      Web canvas overlay styling
-|   |   +-- 05-warm-theme.css  Warm cream/amber theme override
+|   |   +-- 00-tokens.css      Warm Parchment (Light) / Warm Walnut (Dark) M3 tokens + @font-face fallbacks
+|   |   +-- 01-layout.css      Responsive layouts, mobile bottom nav clearance, bento grid, content-visibility
+|   |   +-- 02-components.css  M3 UI components, :focus-visible, native <dialog>, CSP-clean layout utilities
+|   |   +-- 03-motion.css      Keyframe animations, GPU skip-to-content, reduced-motion fallbacks
+|   |   +-- 05-warm-theme.css  Streamlined Warm Parchment/Walnut theme surface system (native light/dark WebP)
 |   +-- js/
-|       +-- app.js             Web app bootstrapper & orchestrator
-|       +-- theme.js           HCT/RGB/HSL color math + dynamic tonal palettes
-|       +-- ripple.js          M3 radial ink ripple engine
-|       +-- shortcuts.js       Keyboard shortcut manager
+|       +-- theme-init.js      Synchronous pre-paint theme resolver (zero FOUT, zero unsafe-inline)
+|       +-- app.js             Web app orchestrator: navigation, theme controls, native <dialog>, safe DOM toast
+|       +-- theme.js           Light/Dark/System theme state, OS listener & meta theme-color
+|       +-- shortcuts.js       15-entry desktop hotkey data + safe DOM search/category filter matrix
 |       +-- github-release.js  GitHub Releases API + download telemetry
-|       +-- canvas/
-|           +-- index.js           Canvas module barrel export
-|           +-- CanvasEngine.js    60fps HTML5 vector canvas engine
-|           +-- ToolManager.js     VectorStroke, VectorShape, tool mode coordination
-|           +-- LassoSelector.js   Lasso selection + OBB transform handles
-|           +-- HistoryManager.js  Command-pattern Undo/Redo engine
 +-- .agents/
 |   +-- skills/          Custom AI skill library
-|   |   +-- ai-mind-map-memory/SKILL.md  ← THIS skill (MANDATORY at session start)
+|   |   +-- ai-mind-map-memory/SKILL.md  <- THIS skill (MANDATORY at session start)
+|   |   +-- web-engineering-standards/   (2026 TS strict, RSC/SSG, DRY, Git, OWASP, Vitest/Playwright/Docker, AI gates)
+|   |   +-- web-design-planning/         (IA, per-route rendering, 15-tier M3 type, layout grids)
+|   |   +-- web-animation-mastery/       (GPU motion, scroll-driven CSS, View Transitions, Canvas2D)
+|   |   +-- web-seo-performance-a11y/    (CWV INP/LCP/CLS budgets, WCAG 2.2, AI Overviews SEO, JSON-LD)
+|   |   +-- web-publishing-deployment/   (CI-gated GitHub/Cloudflare/Firebase deploy, nonce/hash CSP, SW)
+|   |   +-- material-you-web/            (M3 tokens, HCT dynamic color, accessible components)
+|   |   +-- ui-color-theory/             (HCT/OKLCH perceptual color math, WCAG/APCA)
 |   |   +-- pyqt-animation-skill/SKILL.md
-|   |   +-- material-you-web/SKILL.md
 |   |   +-- (others)
 |   +-- memory/          AI persistent memory (this directory)
 +-- GEMINI.md            Workspace rules for AI agent
 +-- Pen 11.spec          PyInstaller build spec
++-- docs/
+|   +-- PEN11_NOTION_GUIDE.md  Notion-ready product, architecture, and extension reference
 ```
 
 ---
@@ -74,7 +77,10 @@ storage.py
   +-- json, os             (stdlib only — zero dependencies)
 
 web/js/app.js
-  +-- theme.js, ripple.js, shortcuts.js, github-release.js, canvas/index.js
+  +-- theme.js, shortcuts.js, github-release.js
+web/index.html
+  +-- js/theme-init.js (sync pre-paint in <head>)
+  +-- js/app.js (module)
 ```
 
 ---
@@ -109,15 +115,11 @@ web/js/app.js
 
 | Component | File | Role |
 |-----------|------|------|
-| `App` | web/js/app.js:L15 | Orchestrator: theme, canvas, shortcuts, releases |
-| `ThemeEngine` | web/js/theme.js:L170 | CSS variable switching + HCT tonal generation |
-| `RippleEngine` | web/js/ripple.js:L8 | M3 radial ripple animations |
-| `ShortcutsManager` | web/js/shortcuts.js:L110 | Keyboard shortcuts on web canvas |
-| `GitHubReleaseManager` | web/js/github-release.js:L47 | GitHub API + download metrics |
-| `CanvasEngine` | web/js/canvas/CanvasEngine.js:L7 | 60fps HTML5 vector canvas render loop |
-| `ToolManager` | web/js/canvas/ToolManager.js:L355 | Tool modes, stroke/shape creation, hit testing |
-| `LassoSelector` | web/js/canvas/LassoSelector.js:L8 | Lasso selection + multi-object OBB transforms |
-| `HistoryManager` | web/js/canvas/HistoryManager.js:L174 | Command-pattern Undo/Redo stack |
+| `theme-init.js` | web/js/theme-init.js:L1 | Synchronous pre-paint theme attribute initializer |
+| `App` | web/js/app.js:L11 | Orchestrator: theme, navigation, shortcuts, releases, native `<dialog>`, toast |
+| `ThemeEngine` | web/js/theme.js:L10 | Light/Dark/System theme persistence, OS media sync & meta theme-color |
+| `ShortcutsManager` | web/js/shortcuts.js:L97 | Safe DOM hotkey search & category filter matrix |
+| `GitHubReleaseManager` | web/js/github-release.js:L47 | GitHub API + download telemetry |
 
 ---
 
@@ -130,7 +132,7 @@ web/js/app.js
 5. **Floating UI**: Draggable toolbar, collapsible pill mode, color palette, shape toolbox
 6. **Smart Popup Positioning**: ALL popups auto-flip left/right, vertical clamp, multi-monitor + taskbar safe
 7. **Canvas Modes**: Transparent overlay, Whiteboard, Blackboard
-8. **Ink Toggle & Click-Through**: Ctrl+5, Win32 WS_EX_TRANSPARENT
+8. **Ink Toggle & Click-Through**: Ctrl+Shift+1 Cursor toggle, Ctrl+Shift+2 visibility, toolbar Cursor control, Win32 WS_EX_TRANSPARENT
 9. **Performance**: D3D11 backend, Per-Monitor DPI, HIGH_PRIORITY_CLASS, GC throttling, 1ms timer (winmm)
 10. **Persistence**: JSON settings in %APPDATA%/Pen11/, per-field validation, debounced writes, toolbar/floating-panel positions, single-instance IPC, atomic write (crash-safe)
 11. **Web Companion**: M3 landing page + live HTML5 canvas demo + GitHub release telemetry
@@ -174,6 +176,8 @@ web/js/app.js
 
 ## Current Focus
 > Updated: 2026-08-28
+
+- Added `docs/PEN11_NOTION_GUIDE.md` as the consolidated maintainer/customization reference.
 
 - All popups now use `FloatingPanel._smart_position()` — screen-edge aware, multi-monitor safe (commit `1e39d44`)
 - Pen tablet support added: pressure-sensitive strokes, eraser-end flip, mouse fallback (commit `21f20b3`)

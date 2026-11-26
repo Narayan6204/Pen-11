@@ -28,6 +28,7 @@
 | `DragHandle` | L403 | Drag widget emitting position delta signals |
 | `OverlayWindow` | L445 | Main transparent fullscreen QMainWindow |
 | `FloatingColorPalette` | L1321 | 12-swatch color picker with active glow |
+| `SizeFeedback` | L379 | Non-interactive temporary tool-size badge |
 | `ToolbarWindow` | L1402 | Primary floating toolbar with pill collapse animation |
 | `AppSystemTray` | L1810 | System tray icon + context menu (Toggle, Clear, About, Exit) |
 | `MainAppCoordinator` | L1864 | Master coordinator: wires all components + restores settings |
@@ -37,6 +38,7 @@
 | Method | Approx Line | Purpose |
 |--------|-------------|---------|
 | `set_click_through()` | L655 | Win32 SetWindowLongW -> WS_EX_TRANSPARENT toggle |
+| `toggle_cursor_mode()` | L1246 | Reversible Cursor-mode toggle that preserves visible drawings |
 | `_build_shape_path()` | L678 | Geometric paths with Shift-key snap (aspect ratio + 45deg) |
 | `_draw_stroke()` | L744 | Render vector stroke with pen/highlighter settings |
 | `_recalculate_master_obb()` | L757 | Oriented bounding box for selected paths |
@@ -69,13 +71,15 @@
 | Method | Approx Line | Purpose |
 |--------|-------------|---------|
 | `_apply_saved_settings()` | L1925 | Restore tool sizes, colors, shapes, toolbar position from storage |
+| `_dock_color_palette()` | L3703 | Reset temporary palette drag state and place it beside the toolbar |
+| `_show_size_feedback()` | L3104 | Show the current tool size beside its toolbar button |
 
 ### Top-Level Functions
 
 | Function | Approx Line | Purpose |
 |----------|-------------|---------|
 | `create_shape_icon()` | L143 | Render antialiased shape -> QPixmap/QIcon dynamically |
-| `setup_global_shortcuts()` | L1835 | Hook global hotkeys via keyboard.add_hotkey |
+| `setup_global_shortcuts()` | L1835 | Register native Win32 hotkeys, including Cursor and visibility toggles |
 
 ---
 
@@ -121,7 +125,13 @@ Run headlessly (no display required for test assertions).
 
 ## web/index.html — Landing Page
 
-**Purpose**: M3 landing page + live HTML5 canvas demo. Loads all web/css/ and web/js/ assets.
+**Purpose**: M3 landing page and product documentation with zero inline styles/scripts, native `<dialog>`, skip link, landmark separation, Schema.org `@graph` (`WebSite`, `BreadcrumbList`, `SoftwareApplication`, `HowTo`, `FAQPage`), PWA manifest link, and subsetted Material Symbols.
+
+---
+
+## web/js/theme-init.js — Pre-Paint Theme Boot
+
+**Purpose**: Synchronously resolves `pen11_theme_mode` and sets `data-theme` / `data-theme-resolved` before first paint without violating strict `script-src 'self'` CSP.
 
 ---
 
@@ -129,7 +139,7 @@ Run headlessly (no display required for test assertions).
 
 | Symbol | Line | Purpose |
 |--------|------|---------|
-| `App` | L15 | Orchestrator: init theme, canvas, shortcuts, release tracker |
+| `App` | L11 | Orchestrator: theme controls, rAF scroll spy, hotkey table init, release tracker, native `<dialog>` focus trap/restore, safe DOM snackbar |
 
 ---
 
@@ -137,38 +147,13 @@ Run headlessly (no display required for test assertions).
 
 | Symbol | Line | Purpose |
 |--------|------|---------|
-| `ThemeEngine` | L170 | CSS var switching + HCT/RGB/HSL tonal palette generation |
+| `ThemeEngine` | L10 | Manages `light`/`dark`/`system` theme state, `localStorage`, OS media listener, and Warm Parchment/Walnut meta `theme-color` |
 
 ---
 
-## web/js/canvas/CanvasEngine.js
+## web/js/shortcuts.js — Shortcut Reference Matrix
 
 | Symbol | Line | Purpose |
 |--------|------|---------|
-| `CanvasEngine` | L7 | 60fps render loop, DPI scaling, pointer event dispatch |
-
----
-
-## web/js/canvas/ToolManager.js
-
-| Symbol | Line | Purpose |
-|--------|------|---------|
-| `VectorStroke` | L11 | Freehand pen/highlighter path data structure |
-| `VectorShape` | L128 | Geometric shape vector data structure |
-| `ToolManager` | L355 | Tool mode, stroke/shape creation, hit testing |
-
----
-
-## web/js/canvas/LassoSelector.js
-
-| Symbol | Line | Purpose |
-|--------|------|---------|
-| `LassoSelector` | L8 | Lasso boundary, OBB, multi-object translate/rotate/scale |
-
----
-
-## web/js/canvas/HistoryManager.js
-
-| Symbol | Line | Purpose |
-|--------|------|---------|
-| `HistoryManager` | L174 | Command-pattern Undo/Redo stack |
+| `SHORTCUTS_DATA` | L6 | 15 verified desktop hotkey definitions |
+| `ShortcutsManager` | L97 | Safe DOM search and `aria-selected` category filter matrix |

@@ -1,46 +1,46 @@
 # Material Design 3 (Material You) Components Guide
 
-This document contains complete, standards-compliant HTML and CSS implementation blueprints for Material 3 components.
+Standards-compliant HTML and CSS implementation blueprints for Material 3 components—aligned with **WCAG 2.2 AA** (`>= 24x24px` minimum / `48x48dp` touch target), keyboard focus visibility, and GPU-compositor animations (`transform`/`opacity` only).
 
 ---
 
-## 1. Buttons
+## 1. Buttons (`>= 48dp` Touch Target Safe, Accessible Icons)
 
 ```html
 <!-- Filled Button -->
-<button class="m3-btn m3-btn-filled m3-interactive">
-  <span class="material-symbols-rounded icon">add</span>
+<button type="button" class="m3-btn m3-btn-filled m3-interactive">
+  <span class="material-symbols-rounded icon" aria-hidden="true">add</span>
   <span>Filled Button</span>
 </button>
 
 <!-- Elevated Button -->
-<button class="m3-btn m3-btn-elevated m3-interactive">
+<button type="button" class="m3-btn m3-btn-elevated m3-interactive">
   <span>Elevated Button</span>
 </button>
 
 <!-- Filled Tonal Button -->
-<button class="m3-btn m3-btn-tonal m3-interactive">
+<button type="button" class="m3-btn m3-btn-tonal m3-interactive">
   <span>Tonal Button</span>
 </button>
 
 <!-- Outlined Button -->
-<button class="m3-btn m3-btn-outlined m3-interactive">
+<button type="button" class="m3-btn m3-btn-outlined m3-interactive">
   <span>Outlined Button</span>
 </button>
 
 <!-- Text Button -->
-<button class="m3-btn m3-btn-text m3-interactive">
+<button type="button" class="m3-btn m3-btn-text m3-interactive">
   <span>Text Button</span>
 </button>
 
 <!-- Floating Action Button (FAB) -->
-<button class="m3-fab m3-interactive" aria-label="Add item">
-  <span class="material-symbols-rounded">edit</span>
+<button type="button" class="m3-fab m3-interactive" aria-label="Edit document">
+  <span class="material-symbols-rounded" aria-hidden="true">edit</span>
 </button>
 
 <!-- Extended FAB -->
-<button class="m3-fab-extended m3-interactive">
-  <span class="material-symbols-rounded">edit</span>
+<button type="button" class="m3-fab-extended m3-interactive">
+  <span class="material-symbols-rounded" aria-hidden="true">edit</span>
   <span>Compose</span>
 </button>
 ```
@@ -51,7 +51,7 @@ This document contains complete, standards-compliant HTML and CSS implementation
   align-items: center;
   justify-content: center;
   gap: 8px;
-  height: 40px;
+  min-height: 40px; /* Exceeds WCAG 2.2 SC 2.5.8 24px min; add >= 4px vertical gap or 48px touch wrapper on mobile */
   padding: 0 24px;
   border-radius: var(--md-sys-shape-corner-full);
   border: none;
@@ -78,10 +78,7 @@ This document contains complete, standards-compliant HTML and CSS implementation
 .m3-btn-elevated {
   background-color: var(--md-sys-color-surface-container-low);
   color: var(--md-sys-color-primary);
-  box-shadow: 0 1px 3px 1px rgba(0,0,0,0.15), 0 1px 2px 0 rgba(0,0,0,0.30);
-}
-.m3-btn-elevated:hover {
-  box-shadow: 0 2px 6px 2px rgba(0,0,0,0.15), 0 1px 2px 0 rgba(0,0,0,0.30);
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.3), 0 1px 3px 1px rgba(0, 0, 0, 0.15);
 }
 
 /* Tonal */
@@ -105,8 +102,8 @@ This document contains complete, standards-compliant HTML and CSS implementation
 }
 
 /* FAB */
-.m3-fab {
-  width: 56px;
+.m3-fab,
+.m3-fab-extended {
   height: 56px;
   border-radius: var(--md-sys-shape-corner-large);
   background-color: var(--md-sys-color-primary-container);
@@ -115,21 +112,17 @@ This document contains complete, standards-compliant HTML and CSS implementation
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  box-shadow: 0 3px 5px -1px rgba(0,0,0,0.2), 0 6px 10px 0 rgba(0,0,0,0.14), 0 1px 18px 0 rgba(0,0,0,0.12);
+  box-shadow: 0 4px 8px 3px rgba(0, 0, 0, 0.15), 0 1px 3px rgba(0, 0, 0, 0.3);
+}
+
+.m3-fab {
+  width: 56px;
 }
 
 .m3-fab-extended {
-  height: 56px;
   padding: 0 20px;
-  border-radius: var(--md-sys-shape-corner-large);
-  background-color: var(--md-sys-color-primary-container);
-  color: var(--md-sys-color-on-primary-container);
-  border: none;
-  display: inline-flex;
-  align-items: center;
   gap: 12px;
   font-weight: 500;
-  box-shadow: 0 3px 5px -1px rgba(0,0,0,0.2), 0 6px 10px 0 rgba(0,0,0,0.14), 0 1px 18px 0 rgba(0,0,0,0.12);
 }
 ```
 
@@ -137,32 +130,34 @@ This document contains complete, standards-compliant HTML and CSS implementation
 
 ## 2. Cards (Elevated, Filled, Outlined)
 
+Use `<article>` with semantic headings and explicit `<img>` media (explicit `width`/`height` prevents CLS and avoids inline `style="..."` CSP hazards). Never make a non-semantic `<div>` clickable around nested buttons:
+
 ```html
 <!-- Elevated Card -->
-<div class="m3-card m3-card-elevated m3-interactive">
-  <div class="m3-card-media" style="background-image: url('...');"></div>
+<article class="m3-card m3-card-elevated">
+  <img class="m3-card-media" src="/images/card-preview.webp" width="400" height="225" alt="Card preview" loading="lazy" />
   <div class="m3-card-content">
     <h3 class="m3-card-title">Elevated Card</h3>
     <p class="m3-card-subhead">Secondary supporting text</p>
     <p class="m3-card-body">Cards contain content and actions about a single subject.</p>
   </div>
-</div>
+</article>
 
 <!-- Filled Card -->
-<div class="m3-card m3-card-filled m3-interactive">
+<article class="m3-card m3-card-filled">
   <div class="m3-card-content">
     <h3 class="m3-card-title">Filled Card</h3>
     <p class="m3-card-body">A card with a filled container color.</p>
   </div>
-</div>
+</article>
 
 <!-- Outlined Card -->
-<div class="m3-card m3-card-outlined m3-interactive">
+<article class="m3-card m3-card-outlined">
   <div class="m3-card-content">
     <h3 class="m3-card-title">Outlined Card</h3>
     <p class="m3-card-body">A card with clean outline strokes.</p>
   </div>
-</div>
+</article>
 ```
 
 ```css
@@ -171,6 +166,13 @@ This document contains complete, standards-compliant HTML and CSS implementation
   overflow: hidden;
   display: flex;
   flex-direction: column;
+}
+
+.m3-card-media {
+  width: 100%;
+  height: auto;
+  object-fit: cover;
+  display: block;
 }
 
 .m3-card-content {
@@ -197,19 +199,15 @@ This document contains complete, standards-compliant HTML and CSS implementation
   line-height: 20px;
 }
 
-/* Elevated */
 .m3-card-elevated {
   background-color: var(--md-sys-color-surface-container-low);
-  box-shadow: 0 1px 3px 1px rgba(0,0,0,0.15), 0 1px 2px 0 rgba(0,0,0,0.30);
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.3), 0 1px 3px 1px rgba(0, 0, 0, 0.15);
 }
 
-/* Filled */
 .m3-card-filled {
   background-color: var(--md-sys-color-surface-container-highest);
-  border: none;
 }
 
-/* Outlined */
 .m3-card-outlined {
   background-color: var(--md-sys-color-surface);
   border: 1px solid var(--md-sys-color-outline-variant);
@@ -220,20 +218,18 @@ This document contains complete, standards-compliant HTML and CSS implementation
 
 ## 3. Adaptive Navigation System
 
-### Navigation Bar (Mobile / Compact <600px)
-
 ```html
-<nav class="m3-nav-bar">
-  <a href="#explore" class="m3-nav-item active m3-interactive">
-    <div class="m3-nav-pill"><span class="material-symbols-rounded">explore</span></div>
+<nav class="m3-nav-bar" aria-label="Primary navigation">
+  <a href="#explore" class="m3-nav-item active m3-interactive" aria-current="page">
+    <div class="m3-nav-pill"><span class="material-symbols-rounded" aria-hidden="true">explore</span></div>
     <span class="m3-nav-label">Explore</span>
   </a>
   <a href="#saved" class="m3-nav-item m3-interactive">
-    <div class="m3-nav-pill"><span class="material-symbols-rounded">bookmark</span></div>
+    <div class="m3-nav-pill"><span class="material-symbols-rounded" aria-hidden="true">bookmark</span></div>
     <span class="m3-nav-label">Saved</span>
   </a>
   <a href="#settings" class="m3-nav-item m3-interactive">
-    <div class="m3-nav-pill"><span class="material-symbols-rounded">settings</span></div>
+    <div class="m3-nav-pill"><span class="material-symbols-rounded" aria-hidden="true">settings</span></div>
     <span class="m3-nav-label">Settings</span>
   </a>
 </nav>
@@ -259,6 +255,8 @@ This document contains complete, standards-compliant HTML and CSS implementation
   color: var(--md-sys-color-on-surface-variant);
   border-radius: var(--md-sys-shape-corner-large);
   padding: 4px 12px;
+  min-width: 48px;
+  min-height: 48px;
 }
 
 .m3-nav-pill {
@@ -289,33 +287,37 @@ This document contains complete, standards-compliant HTML and CSS implementation
 
 ---
 
-## 4. Chips, Sliders & Switches
+## 4. Chips & WCAG 2.2 Accessible GPU-Animated Switch
+
+> [!IMPORTANT]
+> Never use `display: none` on `<input>` inside custom switches—it destroys keyboard Tab focus and screen-reader semantics. Use a visually-hidden `.m3-sr-only` input with `role="switch"`, `:focus-visible`, and compositor `transform` transitions.
 
 ```html
 <!-- Assist Chip -->
-<button class="m3-chip m3-interactive">
-  <span class="material-symbols-rounded icon">event</span>
+<button type="button" class="m3-chip m3-interactive">
+  <span class="material-symbols-rounded icon" aria-hidden="true">event</span>
   <span>Add to Calendar</span>
 </button>
 
 <!-- Filter Chip (Selected) -->
-<button class="m3-chip m3-chip-selected m3-interactive">
-  <span class="material-symbols-rounded icon">check</span>
+<button type="button" class="m3-chip m3-chip-selected m3-interactive" aria-pressed="true">
+  <span class="material-symbols-rounded icon" aria-hidden="true">check</span>
   <span>Favorites</span>
 </button>
 
-<!-- Switch -->
-<label class="m3-switch">
-  <input type="checkbox" checked />
-  <span class="m3-switch-track">
+<!-- Accessible M3 Switch -->
+<label class="m3-switch" for="sync-toggle">
+  <input id="sync-toggle" class="m3-sr-only" type="checkbox" role="switch" checked />
+  <span class="m3-switch-track" aria-hidden="true">
     <span class="m3-switch-thumb"></span>
   </span>
+  <span class="m3-switch-label">Auto-save canvas</span>
 </label>
 ```
 
 ```css
 .m3-chip {
-  height: 32px;
+  min-height: 32px;
   padding: 0 16px;
   border-radius: var(--md-sys-shape-corner-small);
   border: 1px solid var(--md-sys-color-outline);
@@ -334,13 +336,28 @@ This document contains complete, standards-compliant HTML and CSS implementation
   border-color: transparent;
 }
 
-/* Switch */
+/* Visually hidden input preserves keyboard Tab navigation & screen-reader announcements */
+.m3-sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+  border: 0;
+}
+
 .m3-switch {
+  position: relative;
   display: inline-flex;
   align-items: center;
+  gap: 12px;
+  min-height: 48px;
   cursor: pointer;
 }
-.m3-switch input { display: none; }
+
 .m3-switch-track {
   width: 52px;
   height: 32px;
@@ -348,27 +365,36 @@ This document contains complete, standards-compliant HTML and CSS implementation
   background-color: var(--md-sys-color-surface-container-highest);
   border: 2px solid var(--md-sys-color-outline);
   position: relative;
-  transition: all 200ms ease;
+  transition: background-color var(--md-sys-motion-duration-short4) var(--md-sys-motion-easing-standard),
+              border-color var(--md-sys-motion-duration-short4) var(--md-sys-motion-easing-standard);
 }
+
 .m3-switch-thumb {
-  width: 16px;
-  height: 16px;
+  width: 24px;
+  height: 24px;
   border-radius: 50%;
   background-color: var(--md-sys-color-outline);
   position: absolute;
-  top: 6px;
-  left: 6px;
-  transition: all 200ms cubic-bezier(0.2, 0, 0, 1);
+  top: 2px;
+  left: 2px;
+  /* Scale down instead of animating width/height/left so motion stays 100% GPU-composited */
+  transform: translateX(0) scale(0.667);
+  transition: transform var(--md-sys-motion-duration-short4) var(--md-sys-motion-easing-standard),
+              background-color var(--md-sys-motion-duration-short4) var(--md-sys-motion-easing-standard);
 }
+
 .m3-switch input:checked + .m3-switch-track {
   background-color: var(--md-sys-color-primary);
   border-color: var(--md-sys-color-primary);
 }
+
 .m3-switch input:checked + .m3-switch-track .m3-switch-thumb {
-  left: calc(100% - 28px);
-  width: 24px;
-  height: 24px;
-  top: 2px;
+  transform: translateX(20px) scale(1);
   background-color: var(--md-sys-color-on-primary);
+}
+
+.m3-switch input:focus-visible + .m3-switch-track {
+  outline: 3px solid var(--md-sys-color-primary);
+  outline-offset: 2px;
 }
 ```

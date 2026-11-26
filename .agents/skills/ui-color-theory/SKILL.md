@@ -137,22 +137,33 @@ Use CSS Custom Properties to define the color system. Map absolute palette value
 
 ```css
 :root {
-  /* 1. Core Palette (OKLCH Example) */
-  --palette-primary-40: oklch(0.45 0.15 250);
+  color-scheme: light dark;
+
+  /* 1. Core Palette (OKLCH Example — declare every referenced tone) */
+  --palette-primary-10: oklch(0.24 0.10 250);
+  --palette-primary-20: oklch(0.32 0.12 250);
+  --palette-primary-30: oklch(0.40 0.14 250);
+  --palette-primary-40: oklch(0.48 0.15 250);
+  --palette-primary-80: oklch(0.80 0.10 250);
   --palette-primary-90: oklch(0.92 0.05 250);
+
   --palette-neutral-10: oklch(0.20 0.01 250);
-  --palette-neutral-90: oklch(0.95 0.01 250);
+  --palette-neutral-30: oklch(0.38 0.01 250);
+  --palette-neutral-50: oklch(0.55 0.01 250);
+  --palette-neutral-60: oklch(0.64 0.01 250);
+  --palette-neutral-80: oklch(0.84 0.01 250);
+  --palette-neutral-90: oklch(0.92 0.01 250);
   --palette-neutral-98: oklch(0.98 0.005 250);
 
-  /* 2. Semantic Light Theme Tokens */
+  /* 2. Semantic Light Theme Tokens (align prefixes with --md-sys-color-* when using M3) */
   --color-primary: var(--palette-primary-40);
-  --color-on-primary: #FFFFFF;
+  --color-on-primary: #ffffff;
   --color-primary-container: var(--palette-primary-90);
   --color-on-primary-container: var(--palette-primary-10);
 
   --color-background: var(--palette-neutral-98);
   --color-on-background: var(--palette-neutral-10);
-  
+
   --color-surface: var(--palette-neutral-98);
   --color-surface-variant: var(--palette-neutral-90);
   --color-on-surface: var(--palette-neutral-10);
@@ -161,22 +172,35 @@ Use CSS Custom Properties to define the color system. Map absolute palette value
   --color-outline: var(--palette-neutral-50);
 }
 
+[data-theme="dark"] {
+  --color-primary: var(--palette-primary-80);
+  --color-on-primary: var(--palette-primary-20);
+  --color-primary-container: var(--palette-primary-30);
+  --color-on-primary-container: var(--palette-primary-90);
+
+  --color-background: var(--palette-neutral-10);
+  --color-on-background: var(--palette-neutral-90);
+
+  --color-surface: var(--palette-neutral-10);
+  --color-surface-variant: var(--palette-neutral-30);
+  --color-on-surface: var(--palette-neutral-90);
+  --color-on-surface-variant: var(--palette-neutral-80);
+
+  --color-outline: var(--palette-neutral-60);
+}
+
 @media (prefers-color-scheme: dark) {
-  :root {
-    /* Semantic Dark Theme Tokens */
+  :root:not([data-theme="light"]) {
     --color-primary: var(--palette-primary-80);
     --color-on-primary: var(--palette-primary-20);
     --color-primary-container: var(--palette-primary-30);
     --color-on-primary-container: var(--palette-primary-90);
-
     --color-background: var(--palette-neutral-10);
     --color-on-background: var(--palette-neutral-90);
-    
     --color-surface: var(--palette-neutral-10);
     --color-surface-variant: var(--palette-neutral-30);
     --color-on-surface: var(--palette-neutral-90);
     --color-on-surface-variant: var(--palette-neutral-80);
-
     --color-outline: var(--palette-neutral-60);
   }
 }
@@ -192,3 +216,8 @@ Before finalizing any color system, perform the following verifications:
 - [ ] **State Layer Visibility:** Confirm that hover and focus overlays (8% and 12% opacity) produce a visible shift in contrast on all surface tiers.
 - [ ] **Color Blindness Simulation:** Test the UI through Protanopia, Deuteranopia, and Tritanopia simulators. Ensure critical information is not conveyed by color alone.
 - [ ] **Dark Mode Glare Reduction:** Avoid pure `#FFFFFF` text on pure `#000000` backgrounds; use Tone 90 text on Tone 10 backgrounds to prevent halation/astigmatism bleed.
+
+## 9. Cross-References
+
+- [`material-you-web`](../material-you-web/SKILL.md) — Canonical `--md-sys-color-*` M3 token roles, HCT role mapping, and component specs.
+- [`web-seo-performance-a11y`](../web-seo-performance-a11y/SKILL.md) — WCAG 2.2 AA/AAA enforcement (`@axe-core/playwright`) and focus contrast rules.

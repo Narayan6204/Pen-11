@@ -1,5 +1,301 @@
 # Session Log — Pen 11
 
+## Session - 2026-11-26 19:18 IST (Pen 11 Website 2026 Engineering, Security, CWV, WCAG 2.2 & SEO Remediation)
+
+### What Was Done
+- **Zero-`'unsafe-inline'` CSP & Hosting Hardening**:
+  - Created [web/_headers](file:///c:/Users/krish/OneDrive/Documents/Anitgravity%20Projects/Pen%2011/web/_headers) for Cloudflare Pages with strict CSP (`default-src 'self'`, `script-src 'self'`, `style-src 'self' https://fonts.googleapis.com`, `font-src 'self' https://fonts.gstatic.com`, `connect-src 'self' https://api.github.com`), HSTS, `X-Frame-Options: DENY`, `X-Content-Type-Options: nosniff`, `Referrer-Policy`, `Permissions-Policy`, COOP/CORP, and safe `Cache-Control` (removed `immutable` on unhashed JS/CSS).
+  - Synced [firebase.json](file:///c:/Users/krish/OneDrive/Documents/Anitgravity%20Projects/Pen%2011/firebase.json) security headers and non-`immutable` cache rules; updated [serve.js](file:///c:/Users/krish/OneDrive/Documents/Anitgravity%20Projects/Pen%2011/serve.js) with `.webp`/`.webmanifest`/`.xml`/`.txt` MIME types, path-traversal guard, and local CSP header.
+  - Externalized inline `<head>` theme boot script to `web/js/theme-init.js` and removed all `237` inline `style=` attributes from `web/index.html` and JS templates via semantic CSS classes in `web/css/02-components.css`.
+- **CI/CD Quality Gates & Dependency Automation**:
+  - Hardened [.github/workflows/deploy.yml](file:///c:/Users/krish/OneDrive/Documents/Anitgravity%20Projects/Pen%2011/.github/workflows/deploy.yml): dropped `continue-on-error: true` and `gh-pages` fallback, scoped top-level `permissions: contents: read`, added `quality-gates` job running static HTML/CSS/CSP/JSON-LD checks + Playwright `@axe-core/playwright` WCAG 2.2 AA & zero-overflow verification prior to native GitHub Pages deployment.
+  - Added [.github/dependabot.yml](file:///c:/Users/krish/OneDrive/Documents/Anitgravity%20Projects/Pen%2011/.github/dependabot.yml) for weekly `github-actions` and `pip` dependency updates.
+- **Asset, Font & CSS Optimization**:
+  - Generated and verified WebP wave backgrounds (`bg_warm_waves.webp` `34.2 KB`, native Warm Walnut `bg_warm_waves_dark.webp` `28.1 KB` removing live CSS `filter: invert()`), compressed OpenGraph card (`og-preview.jpg` `88.7 KB` at `1200x630`), and PWA icons (`apple-touch-icon.png`, `icon-192.png`, `icon-512.png`); removed superseded `bg_warm_waves.jpg`, unused `web/js/ripple.js`, and empty `web/js/canvas/` directory.
+  - Switched Material Symbols Rounded to an exact 38-glyph Google Fonts `&icon_names=...&display=block` subset (`36 KB` WOFF2 instead of full multi-megabyte variable icon font) + `@font-face` metric-adjusted fallback fonts (`Plus Jakarta Sans Fallback`, `Roboto Flex Fallback`).
+  - Refactored [web/css/00-tokens.css](file:///c:/Users/krish/OneDrive/Documents/Anitgravity%20Projects/Pen%2011/web/css/00-tokens.css) to authentic Warm Parchment (Light) / Warm Walnut (Dark) tokens, cleaned [web/css/01-layout.css](file:///c:/Users/krish/OneDrive/Documents/Anitgravity%20Projects/Pen%2011/web/css/01-layout.css) (pruned unused nav rail/drawer, `overflow-x: clip`, `content-visibility: auto`, comfortable `34px` compact app-bar controls), hardened [web/css/02-components.css](file:///c:/Users/krish/OneDrive/Documents/Anitgravity%20Projects/Pen%2011/web/css/02-components.css) + [web/css/03-motion.css](file:///c:/Users/krish/OneDrive/Documents/Anitgravity%20Projects/Pen%2011/web/css/03-motion.css), and deduplicated [web/css/05-warm-theme.css](file:///c:/Users/krish/OneDrive/Documents/Anitgravity%20Projects/Pen%2011/web/css/05-warm-theme.css) down to 0 `!important` flags and 0 `transition: all`.
+- **WCAG 2.2 Accessibility, Interactive Controls & SEO**:
+  - Added `.skip-to-content` link, moved `<header>` and `<footer class="site-footer">` outside `<main id="main-content" tabindex="-1">`, moved `< 840px` bottom nav clearance onto `.m3-layout-root { flex-direction: column; min-height: 100dvh; }`, added global `:focus-visible` and keyboard-visible `.m3-slider:focus-visible`.
+  - Converted `#download-preference-modal` to native `<dialog>` with synchronous `aria-expanded` sync, Esc/backdrop handling, and focus restoration in `web/js/app.js`; pruned legacy canvas shortcut handlers in `web/js/shortcuts.js`, rendered safe DOM rows, added `aria-selected` tab sync, fixed `Delete / Backspace` slash formatting, and fixed `Pen 11.exe` in FAQ #7.
+  - Added `HowTo` JSON-LD schema for `#quickstart`, updated `web/manifest.webmanifest` + `web/sitemap.xml`, tightened hero/features openers under 30 words, and aligned gallery screenshot aspect dimensions (`420x884`, `291x884`, `297x884`).
+
+### Verification
+- Python static audit (`tinyhtml5`, `tinycss2`, `json`, `xml`): 0 inline `style=`, 0 inline event handlers, 0 CSS parse errors, 0 `transition: all`, 0 `'unsafe-inline'` directives, all JSON-LD/manifest/sitemap/asset links valid.
+- Headless Chrome (`1440x900`, `1024x768`, `840x900`, `768x1024`, `375x812`, `320x568`) CDP verification under strict CSP HTTP headers passed: 0 CSP violations, 0 console/page errors, 0px horizontal overflow at all 6 viewports, 0 mobile footer overlap (`8px` clearance above fixed bottom nav), all fonts/images loaded, native `<dialog>` open/close/focus restore verified, and hotkey filter/search verified. Visual screenshots inspected for both Light and Dark modes plus mobile modal.
+
+### Next Steps
+- Push changes on `main` to verify the new `quality-gates` + GitHub Pages workflows run green on GitHub Actions.
+
+---
+
+## Session - 2026-11-26 18:50 IST (2026 Web Development Guidelines Integration Across Web Skills)
+
+### What Was Done
+- Fetched and analyzed the complete 2026 engineering guide from Netguru (`https://www.netguru.com/blog/web-development-best-practices`, updated Nov 6, 2026).
+- Audited all existing workspace web skills (`.agents/skills/`) and global plugin copies via swarm researcher & adversarial critic subagents, surfacing critical security, CWV, WCAG 2.2, and token-drift gaps.
+- Created cohesive new skill `.agents/skills/web-engineering-standards/`:
+  - `SKILL.md`: stage-by-stage CI merge gates, RUM observability (Sentry/Datadog) & SRE error budgets, constraint-driven stack fit, TypeScript `strict: true` + Zod runtime boundaries, per-route Next.js rendering strategy (SSG vs RSC/Streaming SSR + `'use client'` boundary docs), shared ESLint/Prettier CI checks, Pragmatic DRY (Rule of Three), 80% changed-line coverage floor, `CODEOWNERS` second-reviewer rule (`auth`, `payments`, `.github/workflows/**`), trunk-based Git + Conventional Commits, and AI coding assistant guardrails (Copilot/Cursor/Agents).
+  - `references/ci-testing-docker-gates.md`: Vitest, Playwright Trace Viewer, `@axe-core/playwright` blocking gate, CWV lab/field budgets, and Docker build-once test parity GitHub Actions workflow.
+  - `references/security-owasp-checklist.md`: OWASP Top 10 PR threat checklist, SAST/DAST/SCA (`Dependabot`/`Snyk`, pinned lockfiles), pre-commit + CI `gitleaks`, and nonce vs SHA-256 CSP architecture.
+- Upgraded `.agents/skills/web-seo-performance-a11y/` (`SKILL.md` + 3 references):
+  - Aligned official CWV thresholds (`LCP <= 2.5s`, `INP < 200ms` replacing retired March 2024 FID, `CLS < 0.1`), top 3 INP culprits & priority fixes (`scheduler.yield()`, `useDeferredValue`/RSC, debounced handlers, DevTools Interactions panel), representative-device `lighthouserc.json`, and RUM telemetry.
+  - Added full WCAG 2.2 criteria (`SC 2.5.8` 24x24px targets, `SC 2.5.7` drag alternatives, `SC 2.4.11` Focus Not Obscured, `SC 2.4.13` Focus Appearance, FOUT focus preservation), GPU skip-link transition, hardened `AccessibleModal`, `@axe-core/playwright` blocking gate, and biannual/major-release manual VoiceOver/NVDA + SC mapping cadence.
+  - Added 2026 AI Overviews / zero-click SEO guidance (`< 30` word standalone section openers, pre-deploy Rich Results Test gate, `HowTo`/`Article`/`BreadcrumbList` JSON-LD).
+- Upgraded `.agents/skills/web-publishing-deployment/` (`SKILL.md` + 3 references):
+  - Removed `'unsafe-inline'` script CSP bug in `caching-cdn-headers.md` and replaced it with dynamic SSR nonce + static/ISR build-time SHA-256 hash patterns plus zero-permanent-Report-Only policy and Service Worker caching.
+  - Updated GitHub Actions recipes to Node 22 LTS, `configure-pages@v5`, explicit build output (`./dist`, never `.`), `needs: quality-gates`, Cloudflare Pages (`_headers`), PWA manifest, and pinned Firebase CLI + custom domain DNS/SSL steps.
+- Upgraded `.agents/skills/web-design-planning/`, `.agents/skills/web-animation-mastery/`, `.agents/skills/material-you-web/`, and `.agents/skills/ui-color-theory/`:
+  - Harmonized 15-tier M3 typography scale (`57px`), `--md-sys-motion-easing-standard-decelerate` (`cubic-bezier(0, 0, 0.2, 1)`), and non-overlapping breakpoints (`< 600px`, `600-839px`, `>= 840px`).
+  - Added INP-safe motion, CSS Scroll-Driven Animations, duplicate `view-transition-name` protection, DPR-safe Canvas/Particle resets, fixed `.m3-switch input { display: none; }` WCAG failure in `components-guide.md`, fixed inline JS/styles and A11y in `m3-showcase.html`, and fixed undeclared OKLCH CSS custom properties in `ui-color-theory/SKILL.md`.
+  - Replaced all hardcoded `file:///...` links across web skills with portable relative `./references/` paths.
+- Updated `GEMINI.md` Section 3 to include `web-engineering-standards` and `ui-color-theory`, coordinate `modern-web-guidance`, and fix the `840px` breakpoint overlap.
+
+### Verification
+- PowerShell automated verification passed across all 25 web skill files: valid frontmatter (7/7), zero hardcoded `file:///` URIs, zero broken relative links, zero targeted anti-patterns (`'unsafe-inline'`, `display: none` switch, `node-version: 20`, `@latest` CLI, `onclick=`), cross-skill token consistency confirmed, and 44/44 Netguru 2026 engineering keywords verified.
+
+### Next Steps
+- If the user wants global synchronization across unrelated workspaces, mirror `.agents/skills/` updates into `C:\Users\krish\.gemini\config\plugins\{web-lifecycle-plugin,material-you-plugin}` upon confirmation.
+
+---
+
+## Session - 2026-11-03 19:03 IST (Website Feature Refresh)
+
+### What Was Done
+- Audited the local `web/` companion and confirmed the deployed site is
+  `https://pen-11.pages.dev/`.
+- Updated browser shortcut data from stale `Ctrl+4`/`Ctrl+5` mappings to
+  `Ctrl+Alt+S` Selection Mode, `Ctrl+Shift+1` Cursor toggle, and
+  `Ctrl+Shift+2` canvas visibility.
+- Updated website metadata, Schema.org feature list, hero copy, gallery copy,
+  shortcut table, toolbar tooltip, and release fallback size from GitHub release
+  `v2.2.0` metadata.
+- Clarified that the browser Cursor shortcut is desktop-only and that Color
+  Palette docking is session-only while toolbar and Shapes positions persist.
+
+### Deployment
+- Committed the four website files as `cf1260a` and pushed to `main`.
+- GitHub deployment workflow completed successfully.
+- Verified the live Cloudflare Pages URL now serves the refreshed shortcut and
+  feature content.
+
+### Problems Found / Known Issues
+- Node.js is unavailable in the current environment, so JavaScript syntax
+  validation could not run. Static stale-shortcut scans and whitespace checks
+  passed. The deployment workflow validated and the live page was checked by
+  fetching its HTML.
+
+### Next Steps
+- Install/use Node.js for `node --check` or run the project's browser smoke test
+  when a JavaScript runtime is available.
+
+---
+
+## Session - 2026-11-03 18:59 IST (Add Selection Shortcut)
+
+### What Was Done
+- Added global `Ctrl+Alt+S` for Selection Mode using the existing
+  `switch_select` signal.
+- Updated the Selection toolbar tooltip, README, and Notion-ready guide.
+
+### Validation
+- Pending compilation and focused regression tests.
+
+### Next Steps
+- Manually verify `Ctrl+Alt+S` activates selection and does not interfere with
+  the underlying application.
+
+---
+
+## Session - 2026-11-03 18:45 IST (Remove Ctrl+4 Shortcut)
+
+### What Was Done
+- Removed the native `Ctrl+4` global hotkey registration and unused key constant.
+- Kept Cursor mode available through the toolbar and reversible `Ctrl+Shift+1`
+  toggle.
+- Removed `Ctrl+4` from the Notion-ready shortcut map and updated project memory.
+
+### Validation
+- Python compilation passed.
+- All 8 focused regression tests passed.
+- `git diff --check` passed.
+
+### Next Steps
+- Manually verify that pressing `Ctrl+4` reaches the active Windows application
+  and that the toolbar Cursor button and `Ctrl+Shift+1` still work.
+
+---
+
+## Session - 2026-11-03 (Cursor and Visibility Shortcut Split)
+
+### What Was Done
+- Replaced the old `Ctrl+5` canvas visibility binding with `Ctrl+Shift+2`.
+- Added `Ctrl+Shift+1` as a reversible Cursor-mode toggle that keeps drawings visible.
+- Stored the drawing mode active before Cursor mode and restore it on the second toggle.
+- Kept canvas visibility independent from Cursor mode, including while the canvas is
+  hidden and shown again.
+- Updated the tray menu, README, and Notion-ready guide.
+
+### Key Decisions Made
+- Preserve drawings while entering click-through Cursor mode.
+- Remove the obsolete direct `Ctrl+4` Cursor shortcut; Cursor mode is entered
+  from the toolbar or the reversible `Ctrl+Shift+1` toggle.
+
+### Validation
+- Pending focused mode-transition tests, compilation, and manual Windows verification.
+
+---
+
+## Session - 2026-11-03 18:03 IST (Tool Size Feedback)
+
+### What Was Done
+- Added a temporary non-interactive size badge showing `Pen`, `Highlighter`, or
+  `Eraser` with the current pixel size.
+- Wired feedback to both quick-size menu changes and one-pixel keyboard changes.
+- Positioned the badge beside the active toolbar button with monitor-edge clamping.
+- Added a 900 ms hide timer and hid the badge when the toolbar collapses.
+
+### Key Decisions Made
+- Use a dedicated top-level label with `WA_TransparentForMouseEvents` and no
+  geometry or graphics-effect animation, avoiding the known translucent-window
+  animation crash paths.
+
+### Problems Found / Known Issues
+- Manual visual verification is still recommended for multi-monitor placement,
+  rapid shortcut presses, and toolbar collapse.
+
+### Confidence Level
+- HIGH - Python compilation, focused regression tests, and whitespace validation passed.
+
+### Next Steps
+- Manually press `Ctrl+]`/`Ctrl+[` and select quick sizes to verify the badge
+  appears near the correct tool and updates rapidly without stealing focus.
+
+---
+
+## Session - 2026-11-03 17:53 IST (Pen Preset Sizes)
+
+### What Was Done
+- Changed the Pen quick-size presets to `2, 4, 8, 12, 20, 30 px`.
+- Preserved the Pen runtime and keyboard range of `1..30 px`, so shortcuts still
+  support one-pixel adjustments and a `1 px` pen.
+- Clarified the preset-versus-keyboard behavior in the Notion-ready guide.
+
+### Key Decisions Made
+- Optimize the visible Pen presets for common handwriting sizes while retaining
+  full one-pixel keyboard control.
+
+### Problems Found / Known Issues
+- Manual verification of the long-press Pen menu remains recommended.
+
+### Confidence Level
+- HIGH - The change is isolated to the Pen preset list and documentation; existing
+  tests and bounds remain unchanged.
+
+### Next Steps
+- Verify the Pen menu displays `2, 4, 8, 12, 20, 30` and that `Ctrl+[` can still
+  reach `1 px`.
+
+---
+
+## Session - 2026-11-03 17:43 IST (Size Limit Hardening)
+
+### What Was Done
+- Hardened runtime size setters so direct calls cannot bypass Pen `1..30`,
+  Highlighter `5..80`, or Eraser `10..100` limits.
+- Fixed the quick-size menu label list so the newly added maximum presets
+  (`30`, `80`, `100`) are actually displayed and selectable.
+- Documented the bounded sizes in `README.md` and the Notion-ready guide.
+
+### Key Decisions Made
+- Keep the size policy centralized across persistence, keyboard controls, menus,
+  and direct setters.
+
+### Problems Found / Known Issues
+- Boundary rendering still benefits from manual Windows verification.
+
+### Confidence Level
+- HIGH - The changes are localized and the existing focused suite remains green.
+
+### Next Steps
+- Manually verify all maximum presets appear in the long-press menus.
+
+---
+
+## Session - 2026-11-03 17:41 IST (Tool Size Limits)
+
+### What Was Done
+- Updated size validation to Pen `1..30`, Highlighter `5..80`, and Eraser `10..100`.
+- Updated keyboard increment/decrement bounds in `OverlayWindow`.
+- Updated quick-size menus so their options stay within the same limits.
+- Updated the Notion-ready guide's persistence table.
+
+### Key Decisions Made
+- Pen minimum is `1 px` per the user's preference.
+- Eraser maximum is capped at `100 px` to prevent oversized visual disturbance.
+- Highlighter maximum is capped at `80 px`; pen maximum is capped at `30 px`.
+
+### Problems Found / Known Issues
+- Manual visual verification of the cursor and eraser at boundary sizes is still
+  recommended on Windows.
+
+### Confidence Level
+- HIGH - Focused regression tests, Python compilation, and whitespace validation passed.
+
+### Next Steps
+- Manually verify quick-size selection and keyboard increase/decrease at every
+  boundary on a Windows desktop.
+
+---
+
+## Session - 2026-11-03 17:36 IST (Temporary Color Palette Position)
+
+### What Was Done
+- Removed color palette coordinates from `storage.py` defaults and validation.
+- Removed color palette position restoration and saving from `MainAppCoordinator`.
+- Added temporary docking behavior so the palette opens beside the toolbar every time.
+- Reset palette drag/detached state when it closes or when the canvas hides it.
+- Updated the Notion-ready guide to document that only the shape toolbox retains a detached position.
+
+### Key Decisions Made
+- Color palette dragging is session-only; closing the palette forgets its position.
+- Toolbar and shape-toolbox position persistence remains unchanged.
+
+### Problems Found / Known Issues
+- The behavior still needs manual verification in the running Windows UI because the
+  palette drag/open lifecycle is visual.
+
+### Confidence Level
+- HIGH - The persistence path was removed at both settings and coordinator layers,
+  and docking is centralized in `_dock_color_palette()`.
+
+### Next Steps
+- Run the focused Qt tests and manually verify drag, close, reopen, toolbar move,
+  canvas hide/show, and old settings files.
+
+---
+
+## Session - 2026-11-03 17:17 IST (Notion-Ready Product Documentation)
+
+### What Was Done
+- Created `docs/PEN11_NOTION_GUIDE.md`, a consolidated reference for Pen 11's features, runtime lifecycle, architecture, persistence schema, shortcuts, customization recipes, extension points, testing, build workflow, and fragile areas.
+- Added a developer-reference link to `README.md`.
+- Clearly separated the Windows/PyQt6 desktop application from the independent JavaScript web companion.
+
+### Key Decisions Made
+- Use one Notion-ready Markdown document as the maintainers' operational reference rather than duplicating feature details across multiple README sections.
+- Document existing behavior and extension seams without changing runtime code.
+
+### Problems Found / Known Issues
+- Native Windows, tablet, multi-monitor, DPI, screen-capture, and performance claims still require physical Windows validation when implementation changes touch those areas.
+- Documentation-only work does not validate executable behavior.
+
+### Confidence Level
+- HIGH - The guide was grounded in the current README, memory index, storage implementation, process guard, hotkey registration, coordinator, canvas, web modules, and focused tests.
+
+### Next Steps
+- Keep `docs/PEN11_NOTION_GUIDE.md` updated whenever shortcuts, settings, architecture, or extension points change.
+- Consider adding document export/save-load as a separate feature if persistent annotation sessions are needed.
+
 ---
 
 ## Session - 2026-10-21 20:15 IST (Windows 11 Native Architecture & Compositor Optimizations)
@@ -535,3 +831,60 @@
 - Ready for the next user-requested feature or bug fix
 - Suggested: Add unit tests for `_erase_between()` and `_detect_shape()` (currently untested)
 - Suggested: Review GC disable/enable pattern for safety (fragile area #3)
+## Session - 2026-11-03 19:21 IST (Documentation and Website Fact Audit)
+
+### What Was Done
+- Audited the current desktop implementation, README, Notion guide, local website, and live-release metadata for stale Pen 11 claims.
+- Corrected remaining old shortcut references, including the website's hidden `Ctrl+5` presentation copy.
+- Replaced unsupported benchmark guarantees such as 60 FPS, 0.0% CPU, fixed RAM usage, sub-millisecond response, and 50,000 strokes at 60 FPS with implementation facts and explicit variability.
+- Clarified the desktop-versus-browser boundary and removed Direct3D claims from browser-facing copy.
+- Updated the website's implementation-facts section, structured data, FAQs, comparison copy, release-size context, and desktop feature descriptions.
+- Updated README system requirements, rendering description, persistence wording, and performance FAQ.
+
+### Validation
+- Python compilation passed for `main.py`, `storage.py`, and `process_manager.py`.
+- All 8 tests in `test_selection.py` passed.
+- `git diff --check` passed.
+- Updated website HTML parsed successfully with Python's HTML parser.
+
+### Problems Found / Known Issues
+- Node.js is unavailable, so JavaScript syntax checking could not run locally.
+- Native Windows behavior and resource usage still require physical Windows validation; documentation now avoids presenting those as measured guarantees.
+
+### Confidence Level
+- HIGH - Claims were compared against current implementation constants, behavior, and the current GitHub release asset metadata.
+
+### Next Steps
+- Commit and deploy the README, Notion guide, and website fact corrections.
+- Verify the live page and GitHub `main` after deployment.
+
+### Follow-up Audit
+- Corrected Shapes toolbox persistence wording: only toolbar coordinates persist.
+- Replaced the unconfigured Google Drive mirror label with an official GitHub release link.
+- Corrected the ZIP fallback size to the current v2.2.0 asset and synchronized fallback release metadata.
+- Added `Alt` to the documented wheel-forwarding shortcut and removed the Windows-inaccurate Keynote reference.
+
+## Session - 2026-11-12 17:45 IST (Website Sandbox and Support Removal)
+
+### What Was Done
+- Removed the website's interactive browser drawing sandbox, floating demo toolbar, HUD, canvas initialization, and canvas-only dependency modules.
+- Removed the website support/community section, donation CTA, and donation QR asset.
+- Removed canvas stylesheet loading and stale canvas theme rules.
+- Disabled website keyboard action handling while preserving the searchable desktop shortcut reference.
+- Renamed the desktop and mobile navigation item from `Sandbox` to `Home`.
+- Removed the comparison-table claim for a live web sandbox demo.
+
+### Validation
+- Browser smoke test passed after reload: the page initializes, no canvas or sandbox DOM remains, the community section is absent, and no mobile horizontal overflow is present.
+- Theme controls and remaining navigation loaded successfully.
+- `git diff --check` passed for website changes.
+- JavaScript syntax validation was not run because Node.js is unavailable.
+
+### Problems Found / Known Issues
+- The website still contains desktop-application information and download links by design; those are not part of the removed sandbox/support scope.
+
+### Confidence Level
+- HIGH - Browser reload and responsive checks passed; the requested sandbox and support UI are removed.
+
+### Next Steps
+- Capture final website screenshots and prepare the website-only NIELIT project report and test evidence.

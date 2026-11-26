@@ -21,10 +21,10 @@ This reference details modern, production-grade layout architectures for web app
   width: 100%;
   background-color: var(--md-sys-color-surface);
   color: var(--md-sys-color-on-surface);
-  overflow-x: hidden;
+  overflow-x: clip; /* Prevents horizontal bleed without breaking position: sticky */
 }
 
-@media (max-width: 840px) {
+@media (max-width: 839px) {
   .app-layout-root {
     grid-template-columns: 1fr;
     grid-template-areas:

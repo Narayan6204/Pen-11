@@ -23,8 +23,7 @@ A contrast ratio between Tone $T_1$ and Tone $T_2$ is mathematically guaranteed 
 
 ## 2. The 5 Core Tonal Palettes
 
-From a single seed color (e.g. `#0061A4`), M3 generates 5 primary palettes, each sampled at tones:
-`0, 10, 20, 30, 40, 50, 60, 70, 80, 90, 95, 98, 99, 100`.
+From a single seed color (e.g. `#0061A4`), M3 generates 5 primary palettes across a 0–100 tonal scale (core 14 stops: `0, 10, 20, 30, 40, 50, 60, 70, 80, 90, 95, 98, 99, 100`, plus surface-container stops `4, 6, 12, 17, 22, 24, 87, 92, 94, 96` in the neutral palette):
 
 1. **Primary**: Seed Hue, Chroma ~48 (Key accent color).
 2. **Secondary**: Seed Hue, Chroma ~16 (Complementary, muted accent).
@@ -76,12 +75,13 @@ From a single seed color (e.g. `#0061A4`), M3 generates 5 primary palettes, each
 
 ## 4. Pure Browser-Side Dynamic Theme Generator Script
 
-You can include this lightweight JavaScript module to generate dynamic M3 themes in real-time from any user-selected hex color or wallpaper:
+> [!NOTE]
+> The helper below uses an **HSL approximation** strictly for lightweight zero-dependency demos. Because HSL lightness is not perceptually uniform, **production apps MUST compute true CAM16/HCT palettes (`@material/material-color-utilities`) or CSS `oklch()`** (see [`ui-color-theory`](../../ui-color-theory/SKILL.md)) to guarantee WCAG 2.2 AA/AAA contrast ratios across arbitrary hues.
 
 ```javascript
 /**
- * Generates an M3 HSL-approximated dynamic color system
- * For exact CAM16/HCT calculation, use @material/material-color-utilities
+ * Demo-only M3 HSL-approximated dynamic color system
+ * For production CAM16/HCT contrast guarantees, use @material/material-color-utilities
  */
 export function generateM3ThemeFromHex(seedHex) {
   // Convert HEX to RGB
